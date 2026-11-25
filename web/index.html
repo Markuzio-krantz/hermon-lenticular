@@ -1,0 +1,230 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>עדשות החרמון</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an observatory at dusk. Story on the right, live 3-D model in the middle,
+   instruments (cross-section, sounding, readouts) under it, knobs on the left. Single dark theme by design. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0d19; --panel: #12142a; --panel-2: #181b35; --line: #2a2d4d;
+  --fg: #ece8f2; --fg-dim: #9a96b4; --grid: rgba(154, 150, 180, 0.16);
+  --accent: #ff9a76; --accent-ink: #2a1208;
+  --moist: #6fd6ff; --dry: #d8a24a;
+  --temp: #ff7a6b; --dew: #6fd6ff; --wind: #ffd39a; --stab: #b9a2ff; --ice: #9fd8ff;
+  --moist-band: rgba(111, 214, 255, 0.10); --inv-band: rgba(216, 162, 74, 0.18);
+  --moist-band-solid: #3f7f9a; --inv-band-solid: #8a6a32;
+  --need: rgba(154, 150, 180, 0.32); --cloud-solid: #fff1ea;
+  --rock-hi: #6d625c; --rock-lo: #29242f;
+  --ok: #7fe0a8; --warn: #ffcf6b; --bad: #ff7a6b;
+  --f-display: "Frank Ruhl Libre", "David Libre", Georgia, serif;
+  --f-body: "Assistant", "Segoe UI", Arial, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 10px;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; direction: rtl; overflow: hidden; }
+* { box-sizing: border-box; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-columns: clamp(270px, 24vw, 25rem) minmax(0, 1fr) clamp(220px, 17vw, 17rem); grid-template-rows: auto minmax(0, 1fr) clamp(15rem, 33vh, 21rem);
+  grid-template-areas: "head head head" "story view ctrl" "story instr ctrl"; }
+header { grid-area: head; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; padding-block: 0.6rem; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); }
+header h1 { font-family: var(--f-display); font-weight: 900; font-size: 1.7rem; margin: 0; letter-spacing: 0.01em; }
+header .sub { color: var(--fg-dim); font-size: 0.92rem; }
+header .stamp { margin-inline-start: auto; font-family: var(--f-data); font-size: 0.78rem; color: var(--fg-dim); direction: ltr; }
+
+/* story */
+.story { grid-area: story; overflow-y: auto; border-inline-end: 1px solid var(--line); padding: 1.1rem 1.1rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.chap-nav { display: flex; align-items: center; gap: 0.5rem; }
+.dots { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
+.dots button { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: transparent; font-family: var(--f-data); font-size: 0.68rem; color: var(--fg-dim); cursor: pointer; padding: 0; }
+.dots button[aria-current="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 0.35rem 0.8rem; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.chap-kicker { font-family: var(--f-data); color: var(--accent); font-size: 0.75rem; letter-spacing: 0.08em; }
+.story h2 { font-family: var(--f-display); font-weight: 700; font-size: 1.75rem; line-height: 1.15; margin: 0.15rem 0 0.5rem; text-wrap: balance; }
+.story p { line-height: 1.65; margin: 0; max-width: 62ch; }
+details.deep { border-top: 1px solid var(--line); padding-top: 0.7rem; }
+details.deep summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+details.deep p { color: #d6d1e4; margin-top: 0.6rem; font-size: 0.95rem; }
+.legend-keys { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 0.6rem; align-items: center; font-size: 0.88rem; color: var(--fg-dim); }
+.sw { width: 12px; height: 12px; border-radius: 50%; }
+.about { font-size: 0.88rem; color: var(--fg-dim); line-height: 1.6; border-top: 1px solid var(--line); padding-top: 0.8rem; }
+.about h3 { font-family: var(--f-display); color: var(--fg); font-size: 1.1rem; margin: 0 0 0.4rem; }
+.renders { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 0.6rem; }
+.renders figure { margin: 0; } .renders img { border-radius: 6px; display: block; width: 100%; }
+.renders figcaption { font-size: 0.75rem; margin-top: 2px; }
+
+/* viewport */
+.view { grid-area: view; position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.view canvas { display: block; }
+.labels { position: absolute; inset: 0; }
+.lbl { font-family: var(--f-body); font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px #000, 0 0 8px #000a; white-space: nowrap; pointer-events: none; }
+.lbl-major { font-family: var(--f-display); font-size: 15px; }
+.lbl-n { font-family: var(--f-data); color: var(--accent); }
+.views { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; flex-wrap: wrap; }
+.views button { background: rgba(11, 13, 25, 0.72); border: 1px solid var(--line); border-radius: 6px; padding: 0.25rem 0.6rem; font-size: 0.82rem; cursor: pointer; backdrop-filter: blur(6px); }
+.views button:hover { border-color: var(--accent); }
+.busy { position: absolute; left: 12px; top: 12px; font-family: var(--f-data); font-size: 0.78rem; background: rgba(11, 13, 25, 0.8); padding: 0.25rem 0.6rem; border-radius: 6px; color: var(--accent); }
+.hint { position: absolute; left: 12px; bottom: 10px; font-size: 0.78rem; color: var(--fg-dim); background: rgba(11, 13, 25, 0.6); padding: 0.2rem 0.5rem; border-radius: 6px; }
+.keys { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 0.7rem; font-size: 0.78rem; background: rgba(11, 13, 25, 0.66); padding: 0.3rem 0.6rem; border-radius: 6px; }
+.keys span { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+/* instruments */
+.instr { grid-area: instr; display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 0 10px; border-top: 1px solid var(--line); padding: 8px 10px; min-width: 0; min-height: 0; }
+.readouts { grid-column: 1 / -1; display: flex; gap: 6px; overflow-x: auto; margin-bottom: 6px; padding-bottom: 2px; scrollbar-width: thin; }
+.ro { flex: none; white-space: nowrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0.2rem 0.55rem; display: flex; gap: 0.4rem; align-items: baseline; font-size: 0.8rem; }
+.ro b { font-family: var(--f-data); font-weight: 500; font-size: 0.86rem; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.ro .pill { font-size: 0.72rem; border-radius: 99px; padding: 0 0.45rem; }
+.pill.ok { background: rgba(127, 224, 168, 0.16); color: var(--ok); } .pill.warn { background: rgba(255, 207, 107, 0.16); color: var(--warn); } .pill.bad { background: rgba(255, 122, 107, 0.16); color: var(--bad); }
+.panel { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.panel-h { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.6rem; font-size: 0.82rem; color: var(--fg-dim); flex-wrap: wrap; }
+.panel-h strong { color: var(--fg); font-weight: 600; }
+.tabs { display: flex; gap: 2px; margin-inline-start: auto; }
+.tabs button { border: 0; background: transparent; color: var(--fg-dim); padding: 0.1rem 0.45rem; border-radius: 5px; cursor: pointer; font-size: 0.78rem; }
+.tabs button[aria-selected="true"] { background: var(--panel-2); color: var(--accent); }
+.panel canvas { flex: 1; width: 100%; min-height: 0; direction: ltr; }
+.tip { position: absolute; pointer-events: none; background: #000c; border: 1px solid var(--line); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; white-space: nowrap; }
+
+/* controls */
+.ctrl { grid-area: ctrl; overflow-y: auto; border-inline-start: 1px solid var(--line); padding: 1rem 0.9rem 1.5rem; display: flex; flex-direction: column; gap: 0.9rem; min-width: 0; }
+.ctrl h3 { font-family: var(--f-display); font-size: 1.05rem; margin: 0.4rem 0 -0.2rem; }
+.ctrl label.row { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.5rem; font-size: 0.88rem; }
+.ctrl label.row output { font-family: var(--f-data); font-size: 0.8rem; color: var(--accent); direction: ltr; font-variant-numeric: tabular-nums; }
+.ctrl label.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); direction: ltr; }
+.ctrl label.row small { grid-column: 1 / -1; color: var(--fg-dim); font-size: 0.76rem; line-height: 1.35; }
+.ctrl select { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem; }
+.preset-desc { font-size: 0.84rem; color: var(--fg-dim); line-height: 1.5; margin: 0; }
+.toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0.6rem; font-size: 0.86rem; }
+.toggles label { display: flex; gap: 0.35rem; align-items: center; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 0.3rem 0; font-size: 0.82rem; cursor: pointer; color: var(--fg-dim); }
+.seg button[aria-pressed="true"] { background: var(--panel-2); color: var(--accent); }
+
+@media (max-width: 1100px) {
+  body { overflow: auto; }
+  .app { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 58vh auto auto auto; grid-template-areas: "head" "view" "story" "instr" "ctrl"; }
+  .instr { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 15rem 15rem; }
+  .story, .ctrl { overflow: visible; border: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .instr { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .keys { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<div class="app">
+  <header>
+    <h1>עדשות החרמון</h1>
+    <span class="sub">איך נוצרים ענני עדשה – הדמיה פיזיקלית של האירוע מעל עמק החולה</span>
+    <span class="stamp">19/11/2026 · 16:35 · 33.1°N 35.6°E</span>
+  </header>
+
+  <section class="story" aria-label="סיור מודרך">
+    <div class="chap-nav">
+      <button class="btn" id="prev" aria-label="פרק קודם">→</button>
+      <div class="dots" id="dots"></div>
+      <button class="btn primary" id="next" aria-label="פרק הבא">←</button>
+    </div>
+    <div>
+      <div class="chap-kicker" id="kicker">פרק 1 מתוך 10</div>
+      <h2 id="ctitle">מה רואים בתמונה</h2>
+      <p id="cbody"></p>
+    </div>
+    <details class="deep" id="deepBox"><summary>לעומק: המספרים והפיזיקה</summary><p id="cdeep"></p></details>
+    <div class="legend-keys">
+      <span class="sw" style="background:#fff"></span><span>חבילת אוויר שהתעבתה (בתוך הענן)</span>
+      <span class="sw" style="background:var(--moist)"></span><span>אוויר לח שעוד לא הגיע לרוויה</span>
+      <span class="sw" style="background:var(--dry)"></span><span>אוויר יבש</span>
+      <span class="sw" style="background:#ff5a4e"></span><span>רוטור: הרוח ליד הקרקע מתהפכת</span>
+    </div>
+    <div class="about">
+      <h3>על ההדמיה</h3>
+      <p>הטופוגרפיה אמיתית (נתוני גובה SRTM, רזולוציה 125 מ'). הגלים מחושבים לפי תורת גלי הרים הלינארית, תלת-ממדית ולא-הידרוסטטית, על פרופיל האטמוספרה שנמדד בבית דגן (רדיוסונדה 40179, 19/11 23:05 UTC, ורוחות 12Z). עננים נוצרים היכן שההרמה של קו זרם עולה על ההרמה שדרושה לרוויה בשכבה שממנה הוא הגיע. המרקם, האפייה וההדמיה הקולנועית נבנו ב-Blender.</p>
+      <p>מגבלות: המודל לינארי ולא מדמה ערבול, רוטורים אמיתיים או צמיחת ענני ערמה. עוצמת החסימה ותוספת הלחות בצפון מכוילות לתצפית.</p>
+      <div class="renders">
+        <figure><img src="renders/render_from_hula.jpg" alt="הדמיית Blender: החרמון והעדשות מעמק החולה בשקיעה" loading="lazy"><figcaption>Blender: מבט מהחולה</figcaption></figure>
+        <figure><img src="renders/render_aerial.jpg" alt="הדמיית Blender: מבט אווירי על החרמון ועמק החולה" loading="lazy"><figcaption>Blender: מבט אווירי</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <main class="view" id="view">
+    <div class="views" id="views">
+      <button data-v="overview">מבט כללי</button>
+      <button data-v="hula">מהחולה</button>
+      <button data-v="hermon">ליד החרמון</button>
+      <button data-v="side">חתך צד</button>
+      <button data-v="top">מלמעלה</button>
+    </div>
+    <div class="busy" id="busy" hidden>מחשב גלים…</div>
+    <div class="hint">גרירה: סיבוב · גלגלת: זום · לחיצה כפולה על הקרקע: הזזת החתך</div>
+  </main>
+
+  <section class="instr" aria-label="מכשירים">
+    <div class="readouts" id="readouts"></div>
+    <div class="panel">
+      <div class="panel-h"><strong>חתך לאורך הרוח</strong><span id="xsInfo"></span></div>
+      <canvas id="xs" aria-label="חתך אנכי של קווי הזרם והענן"></canvas>
+      <div class="tip" id="xsTip" hidden></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><strong>האוויר במעלה הרוח</strong>
+        <div class="tabs" role="tablist" id="chartTabs">
+          <button role="tab" data-c="thermo">טמפ׳</button>
+          <button role="tab" data-c="wind">רוח</button>
+          <button role="tab" data-c="lift">הרמה</button>
+          <button role="tab" data-c="scorer">סקורר</button>
+        </div>
+      </div>
+      <canvas id="prof" aria-label="פרופיל אנכי של האטמוספרה"></canvas>
+    </div>
+  </section>
+
+  <aside class="ctrl" aria-label="פרמטרים">
+    <h3>תרחיש</h3>
+    <select id="preset" aria-label="בחירת תרחיש"></select>
+    <p class="preset-desc" id="presetDesc"></p>
+
+    <h3>האטמוספרה</h3>
+    <label class="row">עוצמת הרוח <output id="o-windScale"></output><input type="range" id="windScale" min="0.3" max="2.2" step="0.05"><small>מכפיל את הרוח בכל הגבהים</small></label>
+    <label class="row">סיבוב כיוון הרוח <output id="o-dirOffset"></output><input type="range" id="dirOffset" min="-180" max="180" step="5"><small>180° = רוח מזרחית, מסוריה</small></label>
+    <label class="row">יציבות (הקפיץ) <output id="o-stabilityScale"></output><input type="range" id="stabilityScale" min="0.2" max="3" step="0.05"></label>
+    <label class="row">רוח חזקה ברום <output id="o-upperBoost"></output><input type="range" id="upperBoost" min="0" max="3" step="0.1"><small>מחזקת את הרוח מעל 5 ק"מ ויוצרת לכידת גלים</small></label>
+    <label class="row">לחות כללית <output id="o-rhOffset"></output><input type="range" id="rhOffset" min="-30" max="30" step="1"></label>
+    <label class="row">לחות בשכבה הלחה התחתונה <output id="o-lensBoost"></output><input type="range" id="lensBoost" min="0" max="30" step="1"><small>תוספת סביב 3.8 ק"מ (נמדד: 82%)</small></label>
+    <label class="row">לחות בשכבה הלחה העליונה <output id="o-layer2Boost"></output><input type="range" id="layer2Boost" min="0" max="35" step="1"><small>תוספת סביב 4.3 ק"מ (נמדד: 64%). השכבה היבשה ביניהן לא משתנה</small></label>
+
+    <h3>המודל</h3>
+    <label class="row">עוצמת החסימה <output id="o-blockFactor"></output><input type="range" id="blockFactor" min="0" max="1" step="0.05"><small>0 = כל האוויר עובר מעל ההר</small></label>
+    <label class="row">דעיכת גלים במורד <output id="o-decayLength"></output><input type="range" id="decayLength" min="10000" max="80000" step="2500"></label>
+
+    <h3>תצוגה</h3>
+    <label class="row">גובה השמש <output id="o-sun"></output><input type="range" id="sun" min="-4" max="10" step="0.1"><small>מתחת ל-0: צל כדור הארץ מטפס על העננים</small></label>
+    <label class="row">הגבהה אנכית <output id="o-exag"></output><input type="range" id="exag" min="1" max="4" step="0.25"></label>
+    <label class="row">האצת זמן <output id="o-speed"></output><input type="range" id="speed" min="5" max="150" step="5"></label>
+    <div class="seg" id="parcelMode" role="group" aria-label="חבילות אוויר">
+      <button data-m="off">בלי חלקיקים</button><button data-m="curtain">וילון</button><button data-m="all">בכל מקום</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="tClouds" checked> עננים</label>
+      <label><input type="checkbox" id="tLabels" checked> שמות</label>
+      <label><input type="checkbox" id="tRotors"> רוטורים</label>
+      <label><input type="checkbox" id="tColumn" checked> עמוד אוויר</label>
+      <label><input type="checkbox" id="tSlice" checked> מישור החתך</label>
+    </div>
+    <button class="btn" id="reset">איפוס לתרחיש</button>
+  </aside>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/main.js"></script>

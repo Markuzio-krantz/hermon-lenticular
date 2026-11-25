@@ -1,0 +1,17 @@
+# regenerable / large outputs
+blender/cloud_volume.f32
+blender/clouds.vdb
+blender/*.blend
+blender/*.blend1
+blender/render.log
+blender/*.png
+web/data/height_1024.f32
+
+# the page needs its texture and the Blender renders (repo ignores *.jpg globally)
+!web/data/*.jpg
+!web/renders/*.jpg
+!web/data/*.png
+hermon-lenticular/
+!web/data/*.webp
+web/data/wide_height_1024.f32
+!web/renders/*.mp4

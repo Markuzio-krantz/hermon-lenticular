@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ענן שעומד במקום לעומת אוויר שזז: איך נוצרים ענני עדשה, שלב אחר שלב</title>
+<meta name="description" content="איך נוצרים ענני עדשה: הדמיה תלת-ממדית, שלב אחר שלב, של העדשות מעל החרמון ב-19 בנובמבר 2026, על מפה אמיתית ועם נתוני האטמוספרה של אותו ערב.">
+<meta property="og:title" content="ענן שעומד במקום לעומת אוויר שזז: איך נוצרים ענני עדשה, שלב אחר שלב">
+<meta name="twitter:title" content="ענן שעומד במקום לעומת אוויר שזז: איך נוצרים ענני עדשה, שלב אחר שלב">
+<meta property="og:description" content="הדמיה תלת-ממדית אינטראקטיבית של העדשות מעל החרמון ב-19.11.2026: מפה אמיתית, נתוני האטמוספרה של אותו ערב, ופיזיקה של גלי הרים.">
+<meta name="twitter:description" content="הדמיה תלת-ממדית אינטראקטיבית של העדשות מעל החרמון: מפה אמיתית, נתוני אטמוספרה ופיזיקה של גלי הרים.">
+<meta property="og:image" content="https://hermon-lenticular.pages.dev/renders/preview.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ענן עדשה כתום בשקיעה">
+<meta property="og:url" content="https://hermon-lenticular.pages.dev/"><meta property="og:type" content="website"><meta property="og:locale" content="he_IL">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://hermon-lenticular.pages.dev/renders/preview.jpg">
+<meta name="theme-color" content="#0b0d14">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%23ff8fb0' stroke-width='2'%3E%3Cellipse cx='16' cy='11' rx='9' ry='2.6'/%3E%3Cellipse cx='16' cy='16.5' rx='12' ry='3'/%3E%3Cellipse cx='16' cy='22' rx='8' ry='2.4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="site.css">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" crossorigin>
+</head>
+<body>
+<div class="stage" id="stage" role="img" aria-label="מפה תלת-ממדית של עמק החולה, רמת הגולן והחרמון. גרירה מסובבת, צביטה או גלגלת מקרבות."></div>
+
+<div class="loader" id="loader" role="status"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="16" cy="11" rx="9" ry="2.6"/><ellipse cx="16" cy="16.5" rx="12" ry="3"/><ellipse cx="16" cy="22" rx="8" ry="2.4"/></g></svg><span id="loaderTxt">טוען את המפה…</span></div>
+
+<header class="hud-top">
+  <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="16" cy="11" rx="9" ry="2.6"/><ellipse cx="16" cy="16.5" rx="12" ry="3"/><ellipse cx="16" cy="22" rx="8" ry="2.4"/></g></svg><span class="brand-t"><b>ענן שעומד במקום לעומת אוויר שזז</b><small>איך נוצרים ענני עדשה, שלב אחר שלב</small></span></div>
+  <div class="hud-actions">
+    <button class="chip accent" id="studioBtn" type="button" aria-haspopup="dialog">סטודיו העדשה</button>
+    <button class="chip ghost" id="learnBtn" type="button" aria-controls="learn">ללמוד</button>
+    <button class="chip" id="modeBtn" type="button" aria-pressed="false">מעבדה</button>
+    <button class="chip ghost" id="aboutBtn" type="button" aria-haspopup="dialog">על הפרויקט</button>
+  </div>
+</header>
+
+<nav class="views" id="views" aria-label="נקודת מבט">
+  <button type="button" data-v="hula">מהעמק</button><button type="button" data-v="overview">מבט על</button><button type="button" data-v="hermon">חרמון</button><button type="button" data-v="side">חתך</button><button type="button" data-v="region">אזור</button>
+</nav>
+<div class="maptools" id="maptools" role="toolbar" aria-label="כלי מפה">
+  <button type="button" data-t="in" aria-label="התקרבות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" data-t="out" aria-label="התרחקות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+  <button type="button" data-t="reset" aria-label="חזרה לנקודת המבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
+  <button type="button" data-t="views" class="views-btn" aria-expanded="false" aria-controls="views" aria-label="נקודות מבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
+  <button type="button" data-t="focus" class="focus-btn" aria-pressed="false" aria-label="הסתרת הכפתורים: רק המפה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.1 3.8M6.2 7.6C3.6 9.4 2 12 2 12s3.6 6 10 6c1.4 0 2.7-.3 3.8-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+  <button type="button" data-t="quality" class="quality-btn" aria-expanded="false" aria-controls="qualityMenu" aria-label="איכות התצוגה"><b id="qualityTag">אוטו</b></button>
+  <button type="button" id="siteTourBtn" class="tour-btn" aria-label="סיור באתר: איפה כל דבר"><b>?</b></button>
+  <button type="button" data-t="share" aria-label="העתקת קישור למה שמוצג עכשיו"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+</div>
+<div class="layer-menu" id="layerMenu" role="group" aria-label="מה מוצג במפה"></div>
+<div class="layer-panel" id="layerPanel" role="dialog" aria-label="שכבות המפה: הסבר ושליטה" hidden></div>
+<div class="probe" id="probe" role="dialog" aria-live="polite" hidden></div>
+<p class="hint" id="hint">גרירה: סיבוב · שתי אצבעות או גלגלת: זום · הקשה על המפה או על ענן: מה קורה שם</p>
+<div class="legend" id="legend" aria-live="polite"></div>
+<div class="busy" id="busy" role="status" hidden>מחשב את הגל…</div>
+<figure class="pip" id="pip" hidden><img id="pipImg" alt=""><figcaption id="pipCap"></figcaption><button class="x" id="pipClose" type="button" aria-label="סגירת הצילום">×</button></figure>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="quality-menu" id="qualityMenu" role="radiogroup" aria-label="איכות התצוגה" hidden>
+  <p>איכות התצוגה</p>
+  <button type="button" role="radio" data-q="auto">אוטומטית<small>מתאימה את עצמה למכשיר</small></button>
+  <button type="button" role="radio" data-q="high">גבוהה<small>הכי חד, למחשב חזק</small></button>
+  <button type="button" role="radio" data-q="medium">בינונית<small>איזון בין חדות לתנועה</small></button>
+  <button type="button" role="radio" data-q="low">חסכונית<small>הכי קל, לטלפון או למחשב ישן</small></button>
+</div>
+<aside class="learn" id="learn" aria-labelledby="learnTitle" hidden></aside>
+<footer class="credits">פיתוח: <a href="https://mudu.me" target="_blank" rel="noopener">מארק בורשטיין (mudu.me)</a> · מחקר: <a href="https://www.linkedin.com/in/bennydrobot/" target="_blank" rel="noopener">בני דרובוט</a> · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></footer>
+<p class="sr-only" id="srStatus" aria-live="polite"></p>
+
+<!-- story: one continuous timeline -->
+<section class="card story" id="story" aria-label="איך נוצרת עדשה, שלב אחר שלב">
+  <div class="timeline" role="group" aria-label="שלבים">
+    <button class="play" id="play" type="button" aria-pressed="false" aria-label="הפעלה אוטומטית"></button>
+    <ol class="segs" id="segs"></ol>
+    <button class="min-btn" id="storyMin" type="button" aria-pressed="false" aria-label="הסתרת ההסבר"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+  <div class="step">
+    <small class="step-no" id="stepNo"></small>
+    <h1 id="stepTitle"></h1>
+    <p id="stepLine"></p>
+    <details id="stepMore"><summary>לעומק</summary><p></p><button class="chip ghost" id="stepLearn" type="button" hidden></button></details>
+    <div class="legend-inline" id="legendInline" aria-hidden="true"></div>
+    <button class="chip ghost studio-cta" id="studioCta" type="button" hidden>צפו בהיווצרות מקרוב</button>
+    <button class="chip ghost photo-btn" id="photoBtn" type="button" aria-pressed="false" hidden>הצילום המקורי</button>
+  </div>
+  <div class="step-nav">
+    <button class="btn" id="prev" type="button" aria-label="השלב הקודם"><svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg><span class="lbl">הקודם</span></button>
+    <button class="btn primary" id="next" type="button" aria-label="השלב הבא"><span class="lbl">הבא</span><svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+  </div>
+</section>
+
+<!-- lab -->
+<aside class="card lab" id="lab" aria-labelledby="labTitle" hidden>
+  <div class="lab-head">
+    <button class="handle" id="sheetBtn" type="button" aria-label="הרחבה או כיווץ של המעבדה"><i></i></button>
+    <h2 id="labTitle">המעבדה</h2>
+    <button class="chip" id="beautyBtn" type="button">צפייה בעדשות</button>
+    <button class="chip ghost" id="labShare" type="button" aria-label="העתקת קישור לניסוי">שיתוף</button>
+    <button class="chip ghost" id="tourBtn" type="button">איך משתמשים</button>
+    <button class="min-btn" id="labMin" type="button" aria-pressed="false" aria-label="מזעור המעבדה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+  <div class="lab-body">
+    <div class="verdict" id="verdict" aria-live="polite"></div>
+    <div class="meter" id="meter" aria-hidden="true"><div class="meter-bar"><i id="meterRef"></i><b id="meterFill"></b></div><div class="meter-axis"><span>אין ענן</span><span>כמו באירוע</span><span>פי 3</span></div></div>
+
+    <h3 class="grp">מה יוצר את העדשה</h3>
+    <div class="compass-row" id="cardWind">
+      <svg class="compass" id="compass" viewBox="-70 -70 140 140" role="slider" tabindex="0" aria-label="כיוון הרוח" aria-valuemin="0" aria-valuemax="359"></svg>
+      <div class="compass-txt"><span>הרוח נושבת מ-</span><b id="dirTxt">—</b><span id="dirWords"></span><button class="chip" id="dirReset" type="button">כמו שנמדד</button></div>
+    </div>
+    <div id="ctlCore"></div>
+
+    <h3 class="grp">ניסויים מוכנים</h3>
+    <div class="scenarios" id="scenarios" role="radiogroup" aria-label="ניסויים"></div>
+    <p class="note" id="scnNote"></p>
+
+    <h3 class="grp">תצוגה</h3>
+    <div id="ctlView"></div>
+
+    <details class="more" id="research">
+      <summary>מחקר נוסף</summary>
+      <div class="more-body">
+        <div class="sub" id="cardReal">
+          <h4>אטמוספרה אמיתית לכל יום</h4>
+          <p class="note">רוח, טמפרטורה ולחות בכל הגבהים מעל הגליל (Open-Meteo). כל עמודה היא שלוש שעות, וגובהה הוא מדד ההיתכנות לעדשות. לחיצה מריצה את ההדמיה לאותה שעה.</p>
+          <div class="quick" id="quick">
+            <button type="button" data-q="event">האירוע · רדיוסונדה</button><button type="button" data-q="eventModel">19.11 · נתוני מודל</button><button type="button" data-q="now">עכשיו</button><button type="button" data-q="best">השעה המבטיחה השבוע</button>
+          </div>
+          <div class="tl-bars" id="timeline" role="group" aria-label="מדד היתכנות לעדשות, שבוע אחורה ושבוע קדימה"></div>
+          <div class="when"><label for="date">תאריך<input type="date" id="date" min="2022-01-01"></label><label for="hour">שעה<select id="hour"></select></label></div>
+          <p class="src" id="src"></p>
+        </div>
+        <div id="ctlMore"></div>
+        <div id="ctlModel"></div>
+        <div class="readouts" id="readouts"></div>
+        <figure class="screen" id="screenXs">
+          <figcaption><span>חתך לאורך הרוח</span><small id="xsInfo"></small></figcaption>
+          <div class="screen-body"><canvas id="xs" role="img" aria-label="חתך אנכי: קרקע, קווי זרם לפי לחות, והענן"></canvas><div class="tip" id="xsTip" hidden></div></div>
+        </figure>
+        <figure class="screen" id="screenProf">
+          <figcaption><span>האוויר במעלה הרוח</span><span class="tabs" role="tablist" id="chartTabs"><button role="tab" type="button" data-c="thermo">טמפרטורה</button><button role="tab" type="button" data-c="wind">רוח</button><button role="tab" type="button" data-c="lift">הרמה</button><button role="tab" type="button" data-c="scorer">סקורר</button></span></figcaption>
+          <div class="screen-body tall"><canvas id="prof" role="img" aria-label="פרופיל אנכי של האטמוספרה"></canvas></div>
+          <p class="note screen-note" id="chartNote"></p>
+        </figure>
+      </div>
+    </details>
+    <button class="btn" id="reset" type="button">איפוס לאירוע</button>
+  </div>
+</aside>
+
+<dialog class="about" id="about" aria-labelledby="aboutTitle">
+  <form method="dialog"><button class="close" aria-label="סגירה">×</button></form>
+  <p class="eyebrow">על הפרויקט</p>
+  <h2 id="aboutTitle">ענן שעומד במקום לעומת אוויר שזז</h2>
+  <div class="about-tabs" role="tablist" aria-label="על הפרויקט">
+    <button type="button" role="tab" id="tabStory" aria-selected="true" aria-controls="aboutStory">הסיפור והמדע</button>
+    <button type="button" role="tab" id="tabDev" aria-selected="false" aria-controls="aboutDev" tabindex="-1">הפיתוח והקוד</button>
+  </div>
+  <div class="about-panel" id="aboutStory" role="tabpanel" aria-labelledby="tabStory">
+  <p>ב-19 בנובמבר 2026, בשקיעה, צולמו מעמק החולה שלוש עדשות חלקות מעל החרמון. ההדמיה משחזרת אותן מנתונים אמיתיים: טופוגרפיה, תמונת לוויין, השיגור של בית דגן ותחנות השירות המטאורולוגי בצפון.</p>
+  <h3>ארבע קומות של אוויר באותו ערב</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">גובה</th><th scope="col">מה נמדד</th><th scope="col">מה זה עשה</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1.0–1.9 ק"מ</td><td>יציב, לחות 54–63%, מערבית 8–11 קשר</td><td>ענני כובע אפורים על קו הרכס</td></tr>
+      <tr><td class="num">1.8–2.6 ק"מ</td><td>אינוורסיה של 1.7°C, התייבשות ל-4%</td><td>הקפיץ שמייצר את הגל</td></tr>
+      <tr><td class="num">3.5–4.5 ק"מ</td><td>שכבות של 82% ו-64%, חיץ של 50%, 0–2°C</td><td>העדשות עצמן</td></tr>
+      <tr><td class="num">9.5–12 ק"מ</td><td>רוח 28–40 קשר</td><td>תקרה שמחזירה את הגל ועננות גבוהה ברקע</td></tr>
+    </tbody>
+  </table></div>
+  <h3>איך זה מחושב</h3>
+  <p>לכל מספר גל אופקי נפתרת משוואת הגל של זרימה יציבה מעל הר, η″ + m²η = 0, כש-m² = K²(N²/Ω² − 1), בשכבות של 100 מ' לפי הפרופיל שנמדד. התמרת פורייה הפוכה נותנת את הרמת קווי הזרם בכל נקודה ובכל גובה. ענן נוצר היכן שההרמה של קו זרם גדולה מההרמה שהשכבה שלו צריכה כדי להגיע לרוויה. החישוב רץ בדפדפן תוך כחצי שנייה.</p>
+  <p class="note">מגבלות: המודל לינארי. הוא לא מדמה ערבול, רוטורים אמיתיים או ענני ערמה. עוצמת החסימה (60%) ותוספת של 10% לחות בשכבה של 3.8 ק"מ מכוילות לתצפית.</p>
+  <h3>הצילומים מאותו ערב</h3>
+  <div class="gallery photos">
+    <figure><img src="renders/photo_2.jpg" alt="עדשות מעל החרמון, מצולמות מעמק החולה בשקיעה" loading="lazy" width="1000" height="738"><figcaption>עמק החולה · 19.11.2026 · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></figcaption></figure>
+    <figure><img src="renders/photo_1.jpg" alt="שתי עדשות כתומות מעל רכס, מעל מטע" loading="lazy" width="750" height="1000"><figcaption>אותו ערב, מבט קרוב · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></figcaption></figure>
+    <figure><img src="renders/lens_photo.jpg" alt="ענן עדשה כתום, שכבות שכבות" loading="lazy" width="1250" height="1000"><figcaption>עדשה בשקיעה</figcaption></figure>
+  </div>
+  <h3>הדמיות Blender</h3>
+  <div class="gallery">
+    <figure><img src="renders/render_from_hula.jpg" alt="הדמיית Blender: החרמון והעדשות מעמק החולה בשקיעה" loading="lazy" width="1600" height="900"><figcaption>Blender · מבט מעמק החולה</figcaption></figure>
+    <figure><img src="renders/render_aerial.jpg" alt="הדמיית Blender: מבט אווירי על החרמון ועמק החולה" loading="lazy" width="1600" height="900"><figcaption>Blender · מבט אווירי</figcaption></figure>
+  </div>
+  <h3>קרדיטים</h3>
+  <p>פיתוח: <a href="https://mudu.me" target="_blank" rel="noopener">מארק בורשטיין (mudu.me)</a> · מחקר: <a href="https://www.linkedin.com/in/bennydrobot/" target="_blank" rel="noopener">בני דרובוט</a> · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></p>
+  <h3>מקורות</h3>
+  <ul class="sources">
+    <li>רדיוסונדה בית דגן (40179), 19.11.2026; תחנות השירות המטאורולוגי: הר כנען, מרום גולן, כפר גלעדי, כפר בלום, דפנה.</li>
+    <li>תמונת לוויין: Sentinel-2 cloudless 2016 מאת EOX IT Services, ברישיון CC BY 4.0, מכיל נתוני Copernicus Sentinel מתוקנים.</li>
+    <li>גובה פני השטח: AWS Terrain Tiles (SRTM). שמות מקומות, מים, יערות, מטעים ושטחים בנויים: © תורמי OpenStreetMap, ODbL.</li>
+    <li>אטמוספרה לכל יום: Open-Meteo.com, CC BY 4.0.</li>
+  </ul>
+  </div>
+  <div class="about-panel" id="aboutDev" role="tabpanel" aria-labelledby="tabDev" hidden>
+  <p>הפרויקט נבנה בכמה ימים, מהשיחות של בני על הצילומים ועד אתר ציבורי. מארק הוביל את הכיוון, הבדיקה והטעם; את רוב הקוד, החישובים והעיבוד כתב Claude Code, סוכן הפיתוח של Anthropic, בשיחה מתמשכת. כל שלב נבדק בדפדפן מול הצילומים ומול הנתונים.</p>
+  <h3>הגישות שנבחרו, ולמה</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th scope="col">שאלה</th><th scope="col">הבחירה</th><th scope="col">למה לא האלטרנטיבה</th></tr></thead>
+    <tbody>
+      <tr><td>איך מחשבים את הגל</td><td>תורת גלי הרים לינארית בתלת-ממד, בשכבות של 100 מ', בפתרון ספקטרלי (FFT)</td><td>מודל מזג אוויר מלא (כמו WRF) מדויק יותר אבל דורש שעות על שרת; כאן החישוב לוקח חצי שנייה בדפדפן ומגיב לכל מחוון</td></tr>
+      <tr><td>איך מציירים ענן במפה</td><td>הפיזיקה קובעת איפה יש מים מעובים; ירי קרניים (ray marching) על כרטיס המסך מצייר אותם, ושכבה פרוצדורלית מוסיפה סיבים ושוליים מתפוררים</td><td>מודלים מוכנים או ספרייטים נראים יפה אבל לא משתנים כשמשנים את האטמוספרה</td></tr>
+      <tr><td>איך מראים את ההיווצרות מקרוב</td><td>מודל עדשה פרוצדורלי: ערימת לוחות בפרופיל של עדשה, סיבים לאורך הרוח, גלים בתחתית, ואור שקיעה עם פיזור רב-פעמי</td><td>נפח מהפיזיקה ברזולוציה של 125 מ' גס מדי לקרבה כזו</td></tr>
+      <tr><td>איך שומרים על חדות בלי להעמיס</td><td>ציור רק כשמשהו זז, רזולוציה שמסתגלת לקצב המכשיר, וצבירה של כמה תמונות כשהכול עומד</td><td>ציור קבוע של 60 תמונות בשנייה מחמם טלפונים ומפיל מחשבים חלשים</td></tr>
+      <tr><td>הנוף</td><td>גבהים מ-SRTM, תמונת לוויין Sentinel-2, ומ-OpenStreetMap מים, יערות, מטעים ויישובים</td><td>מפת אריחים חיה לא מאפשרת להאיר את ההר בשמש של אותו רגע</td></tr>
+      <tr><td>מסכים חלשים וטלפונים</td><td>גרסה קולנועית בסטודיו: אותו מודל בדיוק, מצויר מראש באיכות מלאה (12 דגימות לכל תמונה, 576 תמונות) לסרטון של 1.4 MB</td><td>ציור חי באיכות מלאה דורש כרטיס מסך חזק; כך כל מסך מקבל את התוצאה הטובה ביותר, וכפתור אחד עובר לגרסה החיה</td></tr>
+      <tr><td>הדמיות איכות</td><td>Blender (Cycles) לתמונות הסטילס, מאותם גבהים ועננים</td><td>&nbsp;</td></tr>
+    </tbody>
+  </table></div>
+  <h3>איך זה נבנה, שלב אחר שלב</h3>
+  <ol class="steps-list">
+    <li>קריאת השיחות של בני, השיגור של בית דגן ותחנות הצפון, ובניית פרופיל אטמוספרה של אותו ערב.</li>
+    <li>פותר גלי הרים בתלת-ממד, נבדק מול פתרון אנליטי (גבעת אנייזי) ומכויל עד שהעדשות מופיעות בגובה 3.7–3.9 ק"מ, כמו בצילום.</li>
+    <li>הדמיות Blender ראשונות מהעמק ומהאוויר.</li>
+    <li>אתר: מפה רחבה של 128 ק"מ, סיפור ב-12 שלבים, מעבדה, נושאי לימוד ונתונים חיים מ-Open-Meteo.</li>
+    <li>ליטוש: נגישות, מובייל, ביצועים, שכבות מוסברות, צילומים מקוריים.</li>
+    <li>מודל העדשה הפרוצדורלי, סטודיו העדשה, ופרטי קרקע מ-OpenStreetMap.</li>
+    <li>גרסה קולנועית מצוירת מראש, סיור פתיחה, ועמוד הפיתוח הזה.</li>
+  </ol>
+  <h3>במה משתמשים</h3>
+  <ul class="stack">
+    <li><b>בדפדפן:</b> Three.js r170, WebGL2 ו-GLSL, Web Worker לחישוב, JavaScript רגיל בלי שלב בנייה</li>
+    <li><b>הכנת נתונים:</b> Python עם NumPy ו-Pillow; Node לבדיקות המודל</li>
+    <li><b>הדמיות:</b> Blender 5.3, Cycles, OpenVDB</li>
+    <li><b>נתונים:</b> רדיוסונדה בית דגן, השירות המטאורולוגי, SRTM, Sentinel-2, OpenStreetMap, Open-Meteo</li>
+    <li><b>אירוח:</b> Cloudflare Pages</li>
+  </ul>
+  <h3>מפרט</h3>
+  <div class="tablewrap"><table class="spec">
+    <tbody>
+      <tr><th scope="row">תחום החישוב</th><td class="num">64 × 64 ק"מ בתוך מפה של 128 × 128 ק"מ</td></tr>
+      <tr><th scope="row">רשת אופקית</th><td class="num">500 מ' (256 × 256), ענן מוגדל ל-125 מ'</td></tr>
+      <tr><th scope="row">שכבות גובה</th><td class="num">200–8,000 מ', כל 100 מ'</td></tr>
+      <tr><th scope="row">משוואה</th><td class="num">η″ + m²η = 0, m² = K²(N²/Ω² − 1)</td></tr>
+      <tr><th scope="row">חסימה</th><td class="num">קו זרם מפריד × 0.6 (מכויל)</td></tr>
+      <tr><th scope="row">ענן</th><td>היכן שההרמה עולה על ההרמה הנדרשת לרוויה (אדיאבטה יבשה ואז לחה)</td></tr>
+      <tr><th scope="row">ציור ענן</th><td class="num">עד 320 צעדי קרן, 6 צעדי אור, צבירה במנוחה</td></tr>
+      <tr><th scope="row">זמן חישוב</th><td class="num">כ-0.5 שנייה למצב</td></tr>
+      <tr><th scope="row">נגישות</th><td>עברית מימין לשמאל, מקלדת מלאה, קורא מסך, הפחתת תנועה, שלוש רמות איכות</td></tr>
+    </tbody>
+  </table></div>
+  <h3>הקוד</h3>
+  <p>כל הקוד פתוח, ברישיון MIT: <a href="https://github.com/Markuzio-krantz/hermon-lenticular" target="_blank" rel="noopener">github.com/Markuzio-krantz/hermon-lenticular</a>. במאגר יש גם מפרט מלא (SPEC.md) והוראות להרצה מקומית. הצילומים אינם חלק מהרישיון.</p>
+  <p><button class="chip ghost" id="aboutTour" type="button">סיור באתר</button></p>
+  </div>
+</dialog>
+
+<section id="studio" class="studio" role="dialog" aria-modal="true" aria-label="סטודיו העדשה" hidden></section>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/site.js"></script>
+</body>
+</html>

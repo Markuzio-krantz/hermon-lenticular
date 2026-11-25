@@ -1,0 +1,62 @@
+{
+ "extent_m": 64000.0,
+ "centre": [
+  33.25,
+  35.72
+ ],
+ "landmarks": {
+  "hermon": [
+   12758,
+   18492
+  ],
+  "harDov": [
+   2790,
+   4448
+  ],
+  "hulaValley": [
+   -10229,
+   -16679
+  ],
+  "kiryatShmona": [
+   -13856,
+   -4781
+  ],
+  "ramim": [
+   -18598,
+   -13343
+  ],
+  "hNaftali": [
+   -17203,
+   -18903
+  ],
+  "golan": [
+   5579,
+   -22239
+  ],
+  "kfarBlum": [
+   -10136,
+   -8673
+  ],
+  "dafna": [
+   -8090,
+   -2335
+  ],
+  "kfarGiladi": [
+   -13484,
+   -778
+  ],
+  "merom": [
+   5114,
+   -12787
+  ],
+  "harKnaan": [
+   -19714,
+   -31579
+  ],
+  "agamonHula": [
+   -10694,
+   -16123
+  ]
+ },
+ "source": "AWS Open Data Terrain Tiles (Terrarium, SRTM-based), zoom 11"
+}
