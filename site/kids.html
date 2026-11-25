@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מעבדת העננים לילדים</title>
+<meta name="description" content="משחק: מזיזים רוח, הר ולחות ורואים איזה ענן נוצר. ענן עדשה, ענן כובע, רכבת עדשות וענני ערימה.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #1f2340; --ink-2: #4a5078; --card: #fffdf7; --line: #e7e2d4; --accent: #ff7a59; --blue: #3b82f6; --ok: #22a06b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: #fef6e7; color: var(--ink); font-family: 'Rubik', system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+  header h1 { margin: 0; font-size: clamp(1.2rem, 3.6vw, 1.7rem); font-weight: 700; }
+  header a { margin-inline-start: auto; color: var(--ink-2); font-size: .9rem; }
+  main { display: grid; grid-template-columns: 1fr 320px; gap: 14px; padding: 0 16px 16px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .stage { position: relative; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 30px rgb(80 60 20 / .15); background: #9ecbff; min-height: 300px; aspect-ratio: 16 / 9; }
+  canvas { display: block; width: 100%; height: 100%; }
+  .bubble { position: absolute; inset-inline-start: 14px; top: 14px; max-width: min(420px, 75%); display: flex; gap: 10px; align-items: flex-start; }
+  .bubble .who { flex: none; width: 54px; height: 40px; animation: bob 3.2s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-4px) scale(1.04, .97); } }
+  @media (prefers-reduced-motion: reduce) { .bubble .who { animation: none; } }
+  .bubble p { margin: 0; padding: 10px 14px; border-radius: 16px; background: #fff; font-size: 1rem; line-height: 1.45; box-shadow: 0 4px 14px rgb(0 0 0 / .12); }
+  .found { position: absolute; inset-inline-end: 14px; bottom: 14px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / .9); font-weight: 500; font-size: 1rem; }
+  aside { display: grid; gap: 12px; align-content: start; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 1.05rem; }
+  .ctl { display: grid; grid-template-columns: 34px 1fr; gap: 2px 8px; align-items: center; margin-bottom: 10px; }
+  .ctl .ic { grid-row: span 2; font-size: 1.6rem; text-align: center; }
+  .ctl label { font-weight: 500; font-size: .95rem; display: flex; justify-content: space-between; }
+  .ctl label small { color: var(--ink-2); font-weight: 400; }
+  input[type=range] { width: 100%; height: 30px; accent-color: var(--accent); }
+  .switch { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+  .missions { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .missions li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px; background: #fff; border: 2px solid var(--line); font-size: .95rem; }
+  .missions li .st { font-size: 1.3rem; filter: grayscale(1) opacity(.35); transition: filter .4s, transform .4s; }
+  .missions li.done { border-color: #b7e4c7; background: #f0fbf4; }
+  .missions li.done .st { filter: none; transform: scale(1.25) rotate(-10deg); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; border: 0; border-radius: 999px; padding: 10px 16px; background: var(--blue); color: #fff; font-weight: 500; cursor: pointer; }
+  button.ghost { background: #fff; color: var(--ink); border: 2px solid var(--line); }
+  .score { font-size: .95rem; color: var(--ink-2); }
+  .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>מעבדת העננים ☁️</h1>
+  <a href="./">לאתר הגדול</a>
+</header>
+<main>
+  <section class="stage" aria-label="השמיים וההר">
+    <canvas id="sky" role="img" aria-label="הר, רוח ועננים"></canvas>
+    <div class="bubble"><svg class="who" viewBox="0 0 54 40" aria-hidden="true"><path d="M12 34a10 10 0 0 1 0-20 13 13 0 0 1 25-2 9 9 0 0 1 5 22Z" fill="#fff" stroke="#c9d6ea" stroke-width="2"/><circle cx="21" cy="22" r="2.2" fill="#1f2340"/><circle cx="31" cy="22" r="2.2" fill="#1f2340"/><path d="M22 27q4 3 8 0" stroke="#1f2340" stroke-width="2" fill="none" stroke-linecap="round"/></svg><p id="tip" aria-live="polite">שלום! אני ענני. הזיזו את הרוח וראו מה קורה לאוויר שעובר מעל ההר.</p></div>
+    <div class="found" id="found" aria-live="polite"></div>
+  </section>
+  <aside>
+    <div class="card">
+      <h2>המכונה של מזג האוויר</h2>
+      <div class="ctl"><span class="ic" aria-hidden="true">🌬️</span><label for="wind">רוח <small id="o-wind"></small></label><input id="wind" type="range" min="0" max="25" step="1" value="10"></div>
+      <div class="ctl"><span class="ic" aria-hidden="true">⛰️</span><label for="hill">גובה ההר <small id="o-hill"></small></label><input id="hill" type="range" min="0.6" max="3" step="0.1" value="2.2"></div>
+      <div class="ctl"><span class="ic" aria-hidden="true">🪀</span><label for="spring">אוויר קפיצי <small id="o-spring"></small></label><input id="spring" type="range" min="0" max="2" step="0.05" value="1"></div>
+      <div class="ctl"><span class="ic" aria-hidden="true">💧</span><label for="up">לחות למעלה <small id="o-up"></small></label><input id="up" type="range" min="20" max="100" step="1" value="86"></div>
+      <div class="ctl"><span class="ic" aria-hidden="true">🌫️</span><label for="low">לחות למטה <small id="o-low"></small></label><input id="low" type="range" min="20" max="100" step="1" value="55"></div>
+      <label class="switch"><input id="jet" type="checkbox"> 🚀 רוח חזקה מאוד גבוה בשמיים</label>
+    </div>
+    <div class="card">
+      <h2>משימות <span class="score" id="score"></span></h2>
+      <ul class="missions" id="missions"></ul>
+      <div class="row" style="margin-top:10px"><button class="ghost" id="reset" type="button">להתחיל מחדש</button></div>
+    </div>
+  </aside>
+</main>
+<canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
+<script type="module" src="js/kids.js"></script>
+</body>
+</html>

@@ -498,3 +498,15 @@ body.focusing .hint { display: none; }
 .fb-tune output { font: .78rem var(--f-data); color: var(--ink); }
 .fb-dims { margin: 8px 0 0; font: .8rem var(--f-data); color: var(--ink); }
 .fb-dims .chg { color: var(--accent); }
+
+/* drawers stack down the side, so both can stay open without overlapping */
+.docks { flex-direction: column; align-items: flex-end; max-height: calc(100svh - 150px); overflow-y: auto; overflow-x: visible; scrollbar-width: none; }
+[dir="rtl"] .docks { align-items: flex-end; }
+.dock { display: flex; flex-direction: column; align-items: flex-end; }
+.dock-panel { position: static; margin-top: 6px; }
+.hint { inset-inline-end: auto !important; inset-inline-start: 50% !important; transform: translateX(50%) !important; top: calc(env(safe-area-inset-top, 0px) + 58px) !important; }
+@media (max-width: 760px) { .tour-chip { padding: 0 10px; } .hint { top: auto !important; bottom: 40% !important; } }
+@media (min-width: 900px) { .legend { top: auto !important; bottom: 34px !important; left: 20px !important; right: auto !important; } }
+.menu .menu-link { display: grid; gap: 2px; text-align: start; padding: 10px 12px; border-radius: 10px; color: var(--ink); font-size: .95rem; text-decoration: none; }
+.menu .menu-link:hover, .menu .menu-link:focus-visible { background: rgb(255 255 255 / .07); }
+.menu .menu-link small { color: var(--ink-3); font-size: .76rem; }

@@ -3,6 +3,7 @@
 // the Hermon on the globe); Takram's renderer gives it light, shadow, aerial perspective and sky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { EffectComposer, EffectPass, NormalPass, RenderPass, ToneMappingEffect, ToneMappingMode } from 'postprocessing';
 import { AerialPerspectiveEffect, getSunDirectionECEF, PrecomputedTexturesLoader, DEFAULT_PRECOMPUTED_TEXTURES_URL } from '@takram/three-atmosphere';
 import { CloudsEffect, DEFAULT_SHAPE_URL, DEFAULT_SHAPE_DETAIL_URL, DEFAULT_TURBULENCE_URL, CLOUD_SHAPE_TEXTURE_SIZE, CLOUD_SHAPE_DETAIL_TEXTURE_SIZE } from '@takram/three-clouds';
@@ -76,11 +77,29 @@ async function loadHeights(url, n) {
 }
 const wide = await loadHeights('data/wide_height_1024.png', 1024);
 {
-  const S = 512, geo = new THREE.PlaneGeometry(HALF_KM * 2000, HALF_KM * 2000, S - 1, S - 1), pos = geo.attributes.position;
-  for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) pos.setZ(r * S + c, Math.max(0, wide[(r * 2) * 1024 + c * 2]));
+  const small = innerWidth < 760, S = small ? 512 : 1024, st = 1024 / S;
+  const geo = new THREE.PlaneGeometry(HALF_KM * 2000, HALF_KM * 2000, S - 1, S - 1), pos = geo.attributes.position;
+  for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) pos.setZ(r * S + c, Math.max(0, wide[(r * st) * 1024 + c * st]));
   geo.computeVertexNormals();
-  const sat = new THREE.TextureLoader().load('data/wide_sat_4096.webp'); sat.colorSpace = THREE.SRGBColorSpace; sat.anisotropy = 8;
-  const ground = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: sat }));
+  const tl = new THREE.TextureLoader(), aniso = renderer.capabilities.getMaxAnisotropy();
+  const sat = tl.load('data/wide_sat_4096.webp'); sat.colorSpace = THREE.SRGBColorSpace; sat.anisotropy = aniso;
+  const U2 = { core: { value: null }, lc: { value: null }, coreOn: { value: 0 }, lcOn: { value: 0 } };
+  if (!small) tl.load('data/core_sat_4096.webp', (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; U2.core.value = t; U2.coreOn.value = 1; });
+  tl.load('data/wide_landcover_4096.webp', (t) => { t.colorSpace = THREE.NoColorSpace; t.anisotropy = aniso; U2.lc.value = t; U2.lcOn.value = 1; });
+  const mat = new THREE.MeshBasicMaterial({ map: sat });
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U2);
+    sh.fragmentShader = 'uniform sampler2D core, lc; uniform float coreOn, lcOn;\n' + sh.fragmentShader.replace('#include <map_fragment>', `
+      vec4 sc = texture2D(map, vMapUv);
+      if (coreOn > 0.5) { vec2 cu = (vMapUv - 0.25) * 2.0; float w = smoothstep(0.0, 0.03, min(min(cu.x, 1.0 - cu.x), min(cu.y, 1.0 - cu.y)));
+        if (w > 0.0) sc = mix(sc, texture2D(core, clamp(cu, 0.0, 1.0)), w); }
+      if (lcOn > 0.5) { vec4 l = texture2D(lc, vMapUv);
+        sc.rgb = mix(sc.rgb, sc.rgb * vec3(0.62, 0.8, 0.56), l.g * 0.7);                    // forest canopy
+        sc.rgb = mix(sc.rgb, sc.rgb * vec3(0.8, 0.95, 0.7), l.a * 0.5);                     // orchards
+        sc.rgb = mix(sc.rgb, vec3(0.025, 0.06, 0.1), smoothstep(0.15, 0.6, l.r) * 0.9); }  // lakes, ponds, rivers
+      diffuseColor *= sc;`);
+  };
+  const ground = new THREE.Mesh(geo, mat);
   const g = new THREE.Group(); Ellipsoid.WGS84.getEastNorthUpFrame(center).decompose(g.position, g.quaternion, g.scale);
   g.add(ground); scene.add(g);
 }
@@ -150,7 +169,7 @@ const phys = new Float32Array(512 * 512);
 for (let j = 0; j < 512; j++) for (let i = 0; i < 512; i++) phys[j * 512 + i] = Math.max(0, wide[(j + 256) * 1024 + i + 256]);
 initEngine(phys, 512, 64000);
 const result = runScenario({ ...DEFAULTS, ...PRESETS[0].params, volUp: 2, volZ: 128 });
-const lens = buildWeather(result);
+let lens = buildWeather(result), last = result;
 status('');
 
 // ---------- views, time, controls
@@ -180,11 +199,100 @@ if (matchMedia('(max-width: 760px)').matches) { $('q').value = 0; document.query
 const QN = ['low', 'medium', 'high', 'ultra'], QH = ['חסכונית', 'בינונית', 'גבוהה', 'מרבית'];
 function setQ() { const i = +$('q').value; clouds.qualityPreset = QN[i]; $('o-q').textContent = QH[i]; }
 $('q').addEventListener('input', setQ); setQ();
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labels?.setSize(innerWidth, innerHeight); });
 
 let fpsT = performance.now(), fpsN = 0;
 renderer.setAnimationLoop(() => {
-  controls.update(); anchorWeather(); composer.render();
+  controls.update(); formationFrame(performance.now()); anchorWeather(); composer.render(); labels.render(scene, camera);
   fpsN++; const now = performance.now(); if (now - fpsT > 1000) { $('fps').textContent = `${(fpsN * 1000 / (now - fpsT)).toFixed(0)} fps`; fpsN = 0; fpsT = now; }
 });
+// ---------- the air layers, named where they are: what each one is, its height, its humidity
+const labels = new CSS2DRenderer(); labels.setSize(innerWidth, innerHeight);
+Object.assign(labels.domElement.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: 3, direction: 'ltr' });
+document.body.appendChild(labels.domElement);
+const tags = [];
+function rhAt(prof, z) { return prof.RH[Math.min(prof.nz - 1, Math.round(z / prof.dz))]; }
+function placeTags() {
+  for (const t of tags) t.removeFromParent(); tags.length = 0;
+  const prof = last.prof;
+  const LAY = [
+    { z: 4450, t: 'שכבה לחה עליונה', d: `⁦4.05–4.8⁩ ק"מ · ${Math.round(rhAt(prof, 4350))}% לחות → הלוח העליון`, c: '#f0a043' },
+    { z: 4050, t: 'שכבה יבשה ביניהן', d: `${Math.round(rhAt(prof, 4050))}% לחות → רווח שקוף בין הלוחות`, c: '#c9b38a' },
+    { z: 3750, t: 'שכבה לחה תחתונה', d: `⁦3.5–4.05⁩ ק"מ · ${Math.round(rhAt(prof, 3800))}% לחות → הלוח התחתון`, c: '#48c79a' },
+    { z: 2200, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
+  ];
+  // the explanation lives in a side card (collapsible); in the scene only small numbered markers sit at
+  // each layer's height beside the lens, so the lens itself stays clear in the middle
+  LAY.forEach((L, i) => {
+    const m = document.createElement('div'); m.className = 'mark'; m.style.background = L.c; m.textContent = String(i + 1);
+    m.title = L.t; const o = new CSS2DObject(m); o.position.copy(ecef(lens.lat, lens.lon - 0.028, L.z)); scene.add(o); tags.push(o);
+  });
+  $('layersList').innerHTML = LAY.map((L, i) => `<li><i style="background:${L.c}">${i + 1}</i><b>${L.t}</b><span>${L.d}</span></li>`).join('');
+}
+placeTags();
+$('tags').addEventListener('change', () => { labels.domElement.hidden = !$('tags').checked; $('layersCard').hidden = !$('tags').checked; });
+if (innerWidth < 760) $('layersCard').open = false;
+
+// ---------- formation in real time: cap, then the lower plate, then the upper plate, each from its core outward
+const BASE = Array.from(clouds.cloudLayers, (l) => l.densityScale);
+const STAGES = [
+  [0.00, 'אוויר לח זורם מעל ההר. עוד אין ענן.'],
+  [0.12, 'האוויר הנמוך מטפס על המדרון: ענן כובע נצמד לפסגה.'],
+  [0.28, 'בפסגת הגל השכבה הלחה התחתונה מגיעה לנקודת הטל.'],
+  [0.45, 'הלוח התחתון מתעבה ומתפשט מהליבה החוצה.'],
+  [0.62, 'השכבה הלחה העליונה מתעבה: לוח שני מעל הראשון, והשכבה היבשה ביניהם נשארת שקופה.'],
+  [0.85, 'עדשה שלמה. האוויר ממשיך לחלוף דרכה, הצורה נשארת.'],
+];
+let form = null; // { t0 }
+const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+function formationFrame(now) {
+  if (!form) return;
+  const u = Math.min(1, (now - form.t0) / 24000), r = (a, b) => ease((u - a) / (b - a));
+  const g = [r(0.28, 0.6), r(0.6, 0.88), r(0.1, 0.3)];
+  for (let i = 0; i < 3; i++) clouds.cloudLayers[i].densityScale = BASE[i] * g[i];
+  clouds.coverage = 0.3 + (+$('cov').value - 0.3) * r(0.25, 0.95);
+  let k = 0; for (let i = 0; i < STAGES.length; i++) if (u >= STAGES[i][0]) k = i;
+  if ($('cap').dataset.k !== String(k)) { $('cap').dataset.k = String(k); $('cap').textContent = STAGES[k][1]; $('cap').classList.remove('in'); void $('cap').offsetWidth; $('cap').classList.add('in'); }
+  if (u >= 1) { form = null; $('play').textContent = 'הפעלת ההיווצרות שוב'; setTimeout(() => { $('cap').hidden = true; }, 4000); }
+}
+$('play').addEventListener('click', () => { form = { t0: performance.now() }; $('cap').hidden = false; $('cap').dataset.k = ''; $('play').textContent = 'מתחיל מההתחלה…'; });
+
+// ---------- conditions: recompute the atmosphere, rebuild the clouds, say what changed
+function lensStats(r) {
+  const [nx, ny, nz] = r.volDims, dz = 8 / nz, cell = 64 / nx;
+  const B0 = new Float32Array(nx * ny), B1 = new Float32Array(nx * ny);
+  for (let v = 0; v < nz; v++) { const z = (v + 0.5) * dz; const B = z >= 3.45 && z < 4.05 ? B0 : z >= 4.05 && z < 4.9 ? B1 : null; if (!B) continue;
+    for (let k = 0; k < nx * ny; k++) if (r.vol[v * nx * ny + k] > B[k]) B[k] = r.vol[v * nx * ny + k]; }
+  let a0 = 0, a1 = 0, n = 0, mx0 = 0; const th = 0.02;
+  for (let k = 0; k < nx * ny; k++) if (B0[k] > mx0) mx0 = B0[k];
+  for (let k = 0; k < nx * ny; k++) { if (B0[k] > th) a0++; if (B1[k] > th) a1++; }
+  // separate lenses: local maxima of the lower plate, at least 3 km apart
+  const pk = [];
+  for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) { const q = B0[j * nx + i]; if (q < 0.35 * mx0) continue;
+    let ok = true; for (let b = -1; b <= 1 && ok; b++) for (let a = -1; a <= 1; a++) if (B0[(j + b) * nx + i + a] > q) { ok = false; break; }
+    if (ok && !pk.some(([pi, pj]) => Math.hypot(pi - i, pj - j) * cell < 4)) pk.push([i, j]); }
+  n = pk.length;
+  return { area0: a0 * cell * cell, area1: a1 * cell * cell, lenses: n };
+}
+let stats = lensStats(result);
+function showStats(prev) {
+  const d = (a, b, f = 0) => (b == null ? '' : ` <em>(${a - b >= 0 ? '+' : ''}${(a - b).toFixed(f)})</em>`);
+  $('stats').innerHTML = `לוח תחתון ${stats.area0.toFixed(0)} קמ"ר${d(stats.area0, prev?.area0)} · לוח עליון ${stats.area1.toFixed(0)} קמ"ר${d(stats.area1, prev?.area1)} · עדשות באזור ${stats.lenses}${d(stats.lenses, prev?.lenses)}`;
+}
+showStats(null);
+const P = { ...DEFAULTS, ...PRESETS[0].params };
+const FMT = { windScale: (v) => `×${v.toFixed(2)}`, stabilityScale: (v) => `×${v.toFixed(2)}`, lensBoost: (v) => `+${v.toFixed(0)}%` };
+for (const k of Object.keys(FMT)) {
+  const el = $('p-' + k); el.value = P[k]; $('o-' + k).textContent = FMT[k](+P[k]);
+  el.addEventListener('input', () => { $('o-' + k).textContent = FMT[k](+el.value); });
+  el.addEventListener('change', () => {
+    P[k] = +el.value; status('מחשב את האטמוספרה מחדש…');
+    setTimeout(() => {
+      const prev = stats; last = runScenario({ ...P, volUp: 2, volZ: 128 }); lens = buildWeather(last); stats = lensStats(last);
+      showStats(prev); placeTags(); status('');
+    }, 30);
+  });
+}
+$('reset').addEventListener('click', () => { Object.assign(P, DEFAULTS, PRESETS[0].params); for (const k of Object.keys(FMT)) { $('p-' + k).value = P[k]; $('o-' + k).textContent = FMT[k](+P[k]); } $('p-lensBoost').dispatchEvent(new Event('change')); });
+
 window.__proto = { clouds, aerial, camera, result };

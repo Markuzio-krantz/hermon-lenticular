@@ -9,10 +9,11 @@ const STEPS = [
   { show: '#story', sel: '#storyMin', title: 'להסתיר את ההסבר', text: 'החץ הזה מקפל את חלון ההסבר לפס דק עם חצים, והמפה מקבלת את כל המסך. לחיצה נוספת פותחת אותו.' },
   { show: '#docks', sel: '#layersDock', dock: 'layersPanel', title: 'שכבות', text: 'מה מוצג על המפה: עננים, זרימת אוויר, שכבות לחות ועוד. החץ פותח וסוגר, ונגיעה במפה מקפלת הכול.' },
   { show: '#docks', sel: '#toolsDock', dock: 'toolsPanel', title: 'כלים', text: 'נקודות מבט, זום, איכות התצוגה, קישור למה שמוצג, ו"רק מפה" שמסתיר את כל הכפתורים (גם מקש H).' },
-  { show: '.hud-top', sel: '#menuBtn', menu: true, title: 'התפריט', text: 'מיקוד בעדשה: עדשה אחת מקרוב, מהאוויר שמגיע ועד הענן. וגם מעבדה, ללמוד, על הפרויקט, והסיור הזה שוב.' },
+  { show: '.hud-top', sel: '#menuBtn', menu: true, title: 'התפריט', text: 'מיקוד בעדשה: עדשה אחת מקרוב, מהאוויר שמגיע ועד הענן. וגם מעבדה, ללמוד ועל הפרויקט.' },
+  { show: '.hud-top', sel: '#tourChip', title: 'הסיור תמיד כאן', text: 'הכפתור הזה פותח את הסיור שוב, בכל רגע.' },
 ];
 
-export function initSiteTour({ button, onStart, onDock, onMenu } = {}) {
+export function initSiteTour({ button, onStart, onDock, onMenu, onEnd } = {}) {
   let ring = null, box = null, i = 0, opener = null, shown = null;
   const q = (s) => s && document.querySelector(s);
 
@@ -23,7 +24,7 @@ export function initSiteTour({ button, onStart, onDock, onMenu } = {}) {
   function close(done = true) {
     ring?.remove(); box?.remove(); ring = box = null;
     shown?.classList.remove('tour-on'); shown = null; document.body.classList.remove('touring');
-    onDock?.(null); onMenu?.(false);
+    onDock?.(null); onMenu?.(false); onEnd?.();
     removeEventListener('resize', place); document.removeEventListener('keydown', key, true);
     if (done) { try { localStorage.setItem(KEY, 'done'); } catch { /* private mode */ } }
     opener?.focus?.();

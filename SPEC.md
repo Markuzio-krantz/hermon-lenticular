@@ -53,7 +53,7 @@ All maps share one grid: centre 33.25 N 35.72 E, 128 × 128 km, row 0 north.
 - Story: 12 steps with previous / next, keyboard arrows, a segmented timeline, auto-play, and a collapse button that turns the card into a slim bar with arrows.
 - Layers: clouds, air flow, moist layer, air layers (θ surfaces), formation curtain, rotors, wind column, labels; each with an explanation and controls.
 - Map: orbit, zoom, preset views, tap-to-probe, clean mode (H), quality menu, shareable links (`#s4`, `#lab=…`, `#focus`).
-- Calm screen: one menu, and two drawers (layers, tools) that fold to labelled tabs with arrows; touching the map folds everything.
+- Calm screen: one menu, a tour button, and two drawers (layers, tools) that start open on wide screens and fold to labelled tabs with arrows.
 - Opening tour on the first visit: the screen empties and each step brings back only what it explains. Skippable, replayable from the menu and from About.
 - Hebrew right-to-left throughout, keyboard and screen-reader support, reduced motion respected.
 

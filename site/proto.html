@@ -17,7 +17,7 @@
   .bar small { display: block; color: var(--ink-3); font-size: .72rem; font-weight: 400; }
   .chip { min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hair); background: var(--glass); color: var(--ink); font: inherit; font-size: .82rem; backdrop-filter: blur(10px); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
   .chip[aria-pressed="true"] { background: var(--accent); color: #23121a; border-color: transparent; }
-  .panel { position: fixed; z-index: 5; inset-inline-start: 12px; bottom: 12px; width: min(330px, calc(100vw - 24px)); padding: 12px 14px; border-radius: 16px; background: var(--glass); border: 1px solid var(--hair); backdrop-filter: blur(12px); display: grid; gap: 8px; font-size: .82rem; }
+  .panel { position: fixed; z-index: 5; inset-inline-start: 12px; bottom: 12px; width: min(330px, calc(100vw - 24px)); padding: 12px 14px; border-radius: 16px; background: var(--glass); border: 1px solid var(--hair); backdrop-filter: blur(12px); display: grid; gap: 8px; font-size: .82rem; max-height: calc(100svh - 76px); overflow-y: auto; }
   .panel label { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; color: var(--ink-2); }
   .panel input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
   .panel output { font: .76rem 'IBM Plex Mono', monospace; color: var(--ink); direction: ltr; }
@@ -26,11 +26,33 @@
   #status { position: fixed; z-index: 6; inset: 0; display: grid; place-items: center; pointer-events: none; font-size: .9rem; color: var(--ink-2); }
   .panel.folded > :not(#fps) { display: none; }
   .panel.folded { width: auto; padding: 6px 10px; }
+  .chip.primary { background: var(--accent); color: #23121a; border-color: transparent; font-weight: 500; justify-content: center; }
+  .stats { color: var(--ink) !important; font: .76rem 'IBM Plex Mono', 'IBM Plex Sans Hebrew', monospace !important; }
+  .stats em { color: var(--accent); font-style: normal; }
+  .chk { display: flex !important; align-items: center; gap: 6px; color: var(--ink-2); }
+  .cap { position: fixed; z-index: 6; top: 64px; left: 50%; transform: translateX(-50%); margin: 0; max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px; border-radius: 14px; background: var(--glass); border: 1px solid var(--hair); backdrop-filter: blur(10px); font-size: .95rem; text-align: center; }
+  .cap.in { animation: capIn .6s ease both; } @keyframes capIn { from { opacity: 0; transform: translate(-50%, 6px); } }
+  .layers-card { position: fixed; z-index: 5; inset-inline-end: 12px; top: 64px; width: min(300px, calc(100vw - 24px)); padding: 8px 12px; border-radius: 14px; background: var(--glass); border: 1px solid var(--hair); backdrop-filter: blur(10px); font-size: .8rem; }
+  .layers-card summary { cursor: pointer; color: var(--accent); font-size: .84rem; }
+  .layers-card ol { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 6px; }
+  .layers-card li { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; }
+  .layers-card li i { grid-row: span 2; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 600 .72rem 'IBM Plex Mono', monospace; font-style: normal; color: #14121a; }
+  .layers-card li b { font-weight: 500; } .layers-card li span { color: var(--ink-3); font-size: .72rem; }
+  .layers-card > p { margin: 0; color: var(--ink-3); font-size: .7rem; }
+  .mark { left: 0; top: 0; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 600 .68rem 'IBM Plex Mono', monospace; color: #14121a; box-shadow: 0 0 0 2px rgb(0 0 0 / .35); }
+  .ladder { left: 0; top: 0; display: grid; gap: 4px; padding: 8px 10px; border-radius: 12px; background: rgb(12 14 22 / .74); border: 1px solid var(--hair); margin-inline-end: 14px; }
+  .ladder p { margin: 0 0 2px; font-size: .74rem; color: var(--accent); }
+  .ladder .tag { background: none; border: 0; padding: 2px 0; transform: none; }
+  .tag { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; padding: 6px 10px; border-radius: 10px; background: rgb(12 14 22 / .72); border: 1px solid var(--hair); font-size: .78rem; white-space: nowrap; transform: translateX(-10px); }
+  .tag i { grid-row: span 2; width: 10px; height: 10px; border-radius: 3px; }
+  .tag b { font-weight: 500; } .tag span { color: var(--ink-3); font-size: .72rem; }
   #fps { font: .72rem 'IBM Plex Mono', monospace; color: var(--ink-3); direction: ltr; }
 </style>
 </head>
 <body>
 <div id="stage"></div>
+<details class="layers-card" id="layersCard" open><summary>שכבות האוויר סביב העדשה</summary><ol id="layersList"></ol><p>המספרים ליד העדשה מסמנים את גובה כל שכבה.</p></details>
+<p class="cap" id="cap" aria-live="polite" hidden></p>
 <div id="status">טוען את האטמוספרה והעננים…</div>
 <header class="bar">
   <h1>אב־טיפוס: עננים נפחיים ואטמוספרה פיזיקלית<small>הפיזיקה שלנו קובעת איפה העדשות; Takram מצייר אותן</small></h1>
@@ -43,6 +65,12 @@
     <button class="chip" type="button" data-v="near">ליד העדשה</button>
     <button class="chip" type="button" data-v="above">מעל</button>
   </div>
+  <button class="chip primary" id="play" type="button">הפעלת ההיווצרות</button>
+  <label>רוח <output id="o-windScale"></output><input id="p-windScale" type="range" min="0.4" max="1.8" step="0.05"></label>
+  <label>יציבות <output id="o-stabilityScale"></output><input id="p-stabilityScale" type="range" min="0.3" max="1.8" step="0.05"></label>
+  <label>לחות בשכבת העדשה <output id="o-lensBoost"></output><input id="p-lensBoost" type="range" min="0" max="25" step="1"></label>
+  <p class="stats" id="stats" aria-live="polite"></p>
+  <div class="row"><button class="chip" id="reset" type="button">חזרה לערב 19.11</button><label class="chk"><input type="checkbox" id="tags" checked> שמות השכבות</label></div>
   <label>שעה (שעון ישראל) <output id="o-time"></output><input id="time" type="range" min="900" max="1050" step="1" value="995"></label>
   <label>כמה מהעדשה נראה <output id="o-cov"></output><input id="cov" type="range" min="0.2" max="0.95" step="0.01" value="0.62"></label>
   <label>איכות <output id="o-q"></output><input id="q" type="range" min="0" max="3" step="1" value="1"></label>

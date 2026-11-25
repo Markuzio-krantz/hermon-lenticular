@@ -33,12 +33,15 @@
   <div class="hud-actions">
     <button class="chip accent d-only" id="focusBtn" type="button" aria-pressed="false">מיקוד בעדשה</button>
     <button class="chip d-only" id="modeBtn" type="button" aria-pressed="false">מעבדה</button>
+    <button class="chip ghost tour-chip" id="tourChip" type="button" aria-label="סיור באתר">סיור</button>
     <button class="chip ghost menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>תפריט</span></button>
   </div>
   <nav class="menu" id="menu" aria-label="תפריט" hidden>
     <button class="m-only" type="button" data-go="focus">מיקוד בעדשה<small>עדשה אחת מקרוב: האוויר מגיע, עולה ומתעבה</small></button>
     <button class="m-only" type="button" data-go="lab" id="menuLab">מעבדה<small>משנים את האטמוספרה בעצמכם</small></button>
     <button type="button" id="learnBtn" aria-controls="learn">ללמוד<small>נושאים קצרים, כל אחד עם ניסוי</small></button>
+    <a class="menu-link" href="kids.html">מעבדת העננים לילדים<small>משחק: מזיזים רוח, הר ולחות ורואים איזה ענן נוצר</small></a>
+    <a class="menu-link" href="proto.html">עננים נפחיים (ניסיוני)<small>אטמוספרה פיזיקלית והיווצרות בזמן אמת</small></a>
     <button type="button" id="aboutBtn" aria-haspopup="dialog">על הפרויקט<small>המדע, הפיתוח והקוד</small></button>
     <button type="button" id="siteTourBtn">סיור באתר<small>איפה כל דבר, בחצי דקה</small></button>
   </nav>
@@ -225,7 +228,7 @@
   </ul>
   </div>
   <div class="about-panel" id="aboutDev" role="tabpanel" aria-labelledby="tabDev" hidden>
-  <p>הפרויקט נבנה בכמה ימים, מהשיחות של בני על הצילומים ועד אתר ציבורי. מארק הוביל את הכיוון, הבדיקה והטעם; את רוב הקוד, החישובים והעיבוד כתב Claude Code, סוכן הפיתוח של Anthropic, בשיחה מתמשכת. כל שלב נבדק בדפדפן מול הצילומים ומול הנתונים.</p>
+  <p>מפרט טכני: מה נבנה, באילו גישות ובאילו כלים, ובאיזה סדר.</p>
   <h3>הגישות שנבחרו, ולמה</h3>
   <div class="tablewrap"><table>
     <thead><tr><th scope="col">שאלה</th><th scope="col">הבחירה</th><th scope="col">למה לא האלטרנטיבה</th></tr></thead>
@@ -238,9 +241,9 @@
       <tr><td>הדמיות איכות</td><td>Blender (Cycles) לתמונות הסטילס, מאותם גבהים ועננים</td><td>&nbsp;</td></tr>
     </tbody>
   </table></div>
-  <h3>איך זה נבנה, שלב אחר שלב</h3>
+  <h3>שלבי הבנייה</h3>
   <ol class="steps-list">
-    <li>קריאת השיחות של בני, השיגור של בית דגן ותחנות הצפון, ובניית פרופיל אטמוספרה של אותו ערב.</li>
+    <li>איסוף הנתונים: השיגור של בית דגן ותחנות הצפון, ובניית פרופיל אטמוספרה של אותו ערב.</li>
     <li>פותר גלי הרים בתלת-ממד, נבדק מול פתרון אנליטי (גבעת אנייזי) ומכויל עד שהעדשות מופיעות בגובה 3.7–3.9 ק"מ, כמו בצילום.</li>
     <li>הדמיות Blender ראשונות מהעמק ומהאוויר.</li>
     <li>אתר: מפה רחבה של 128 ק"מ, סיפור ב-12 שלבים, מעבדה, נושאי לימוד ונתונים חיים מ-Open-Meteo.</li>

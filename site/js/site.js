@@ -705,7 +705,7 @@ const focus = createFocus({ S, clouds, viz, curtain, state, windAngle,
     flowMode = 'curtain'; calloutIds = []; viz.setCallouts([]); S.labels.focus(null);
     applyVisuals(); layerTargets(); syncLayers(); S.invalidate();
   },
-  onEnter: () => { if (playing) setPlaying(false); closeFloating(); setDock(null); S.setFrameOffset(0, 0); $('focusBtn').setAttribute('aria-pressed', 'true'); setHash('focus'); },
+  onEnter: () => { if (playing) setPlaying(false); closeFloating(); S.setFrameOffset(0, 0); $('focusBtn').setAttribute('aria-pressed', 'true'); setHash('focus'); },
   onExit: () => {
     $('focusBtn').setAttribute('aria-pressed', 'false'); clouds.uniforms.uGrow.value = 1;
     if (state.mode === 'lab') { setMode('lab'); } else go(step);
@@ -724,7 +724,7 @@ $('studioCta').addEventListener('click', enterFocus);
 // ---------- one menu, two docks: everything else stays off the map until asked for
 function menu(open) {
   const m = $('menu'); open = open ?? m.hidden; m.hidden = !open; $('menuBtn').setAttribute('aria-expanded', String(open));
-  if (open) { setDock(null); m.querySelector('button:not([style*="none"])')?.focus(); }
+  if (open) { m.querySelector('button:not([style*="none"])')?.focus(); }
 }
 $('menuBtn').addEventListener('click', () => menu());
 for (const b of $('menu').querySelectorAll('button')) b.addEventListener('click', () => {
@@ -732,17 +732,24 @@ for (const b of $('menu').querySelectorAll('button')) b.addEventListener('click'
   if (b.dataset.go === 'focus') enterFocus();
   if (b.dataset.go === 'lab') $('modeBtn').click();
 });
-function setDock(which) {
+function setDock(which, open, persist = true) {
+  // which: a panel id, or null for all; open: true / false / undefined (toggle)
   for (const [id, peek] of [['layersPanel', 'layersPeek'], ['toolsPanel', 'toolsPeek']]) {
-    const open = which === id; $(id).hidden = !open; $(peek).setAttribute('aria-expanded', String(open));
+    if (which && which !== id) continue;
+    const o = open ?? $(id).hidden; $(id).hidden = !o; $(peek).setAttribute('aria-expanded', String(o));
   }
-  if (which) menu(false);
+  if (persist) try { localStorage.setItem('lenticular.docks', JSON.stringify({ l: !$('layersPanel').hidden, t: !$('toolsPanel').hidden })); } catch { /* private mode */ }
 }
-$('layersPeek').addEventListener('click', () => setDock($('layersPanel').hidden ? 'layersPanel' : null));
-$('toolsPeek').addEventListener('click', () => setDock($('toolsPanel').hidden ? 'toolsPanel' : null));
-// touching the map folds everything away
-S.renderer.domElement.addEventListener('pointerdown', () => { setDock(null); menu(false); if (!$('qualityMenu').hidden) { $('qualityMenu').hidden = true; } });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null); } });
+$('layersPeek').addEventListener('click', () => setDock('layersPanel'));
+$('toolsPeek').addEventListener('click', () => setDock('toolsPanel'));
+{ // open on wide screens unless the visitor folded them before
+  let d = null; try { d = JSON.parse(localStorage.getItem('lenticular.docks')); } catch { /* none */ }
+  const wide = innerWidth >= 900;
+  setDock('layersPanel', d ? d.l : wide); setDock('toolsPanel', d ? d.t : wide);
+}
+// touching the map closes the menu; the drawers stay as the visitor left them
+S.renderer.domElement.addEventListener('pointerdown', () => { menu(false); if (!$('qualityMenu').hidden) { $('qualityMenu').hidden = true; } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null, false); } });
 
 // ---------- start
 const startHash = location.hash;
@@ -758,7 +765,11 @@ if (linked?.lab) {
 } else { go(linked?.step ?? 0); compute(); }
 if (startHash === '#focus' || startHash === '#studio') setTimeout(enterFocus, 2500);
 // opening tour: once on the first visit (not on shared links), always from the "סיור" button
-const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDock(d); menu(false); }, onMenu: (o) => menu(o), onStart: () => {
+let dockSave = null;
+const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDock(null, false, false); if (d) setDock(d, true, false); menu(false); },
+  onEnd: () => { if (dockSave) { setDock('layersPanel', dockSave.l, false); setDock('toolsPanel', dockSave.t, false); } },
+  onMenu: (o) => menu(o), onStart: () => {
+  dockSave = { l: !$('layersPanel').hidden, t: !$('toolsPanel').hidden };
   if (focus.isOn) focus.exit();
   if (state.mode !== 'story') setMode('story');
   if (learn.isOpen) learn.close();
@@ -766,6 +777,7 @@ const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDo
   if ($('storyMin').getAttribute('aria-pressed') === 'true') $('storyMin').click();
   if (playing) setPlaying(false);
 } });
+$('tourChip').addEventListener('click', () => siteTour.start());
 if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !focus.isOn) siteTour.start(); }, 2200);
 requestAnimationFrame(frame);
 setTimeout(() => $('hint').classList.add('gone'), 9000);

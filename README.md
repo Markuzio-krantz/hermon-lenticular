@@ -55,4 +55,3 @@ See [SPEC.md](SPEC.md) for the model, the rendering and the data.
 - Radiosonde: Bet Dagan 40179; surface stations of the Israel Meteorological Service.
 - **The photographs are not included and are not covered by the licence.** The build expects `web/renders/photo_1.jpg`, `photo_2.jpg`, `lens_photo.jpg` and `preview.jpg`; without them the site works but the photo buttons show nothing.
 
-Built with [Claude Code](https://claude.com/claude-code).
