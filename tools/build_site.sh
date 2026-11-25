@@ -3,7 +3,7 @@
 set -e
 OUT=hermon-lenticular
 rm -rf "$OUT"; mkdir -p "$OUT/js" "$OUT/data" "$OUT/renders"
-cp site/index.html site/site.css "$OUT/"
+cp site/index.html site/proto.html site/site.css "$OUT/"
 for f in web/js/*.js; do case "$(basename "$f")" in main.js|ui.js) ;; *) cp "$f" "$OUT/js/";; esac; done
 cp site/js/*.js "$OUT/js/"
 cp web/data/wide_height_1024.png web/data/wide_normal_2048.webp web/data/wide_sat_2048.webp web/data/wide_sat_4096.webp web/data/core_sat_4096.webp web/data/wide_landcover_4096.webp web/data/places.json "$OUT/data/"
