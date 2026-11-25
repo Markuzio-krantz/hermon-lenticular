@@ -34,7 +34,8 @@ float qAt(vec3 p) {
 }
 // cheap version for light, shade and normals: the smooth shell only
 // growth: the cloud appears from its wettest core outward; focus: other clouds step back
-float thrQ() { return mix(uQmax * 0.85, 0.003, clamp(uGrow, 0.0, 1.0)); }
+uniform float uGrowRef;
+float thrQ() { float ref = uGrowRef > 0.0 ? uGrowRef : uQmax; return mix(ref * 0.85, 0.003, clamp(uGrow, 0.0, 1.0)); }
 float focusK(vec3 p) { return uFocus.w > 0.0 ? mix(0.1, 1.0, smoothstep(uFocus.w + 5.0, uFocus.w, length(p.xz - uFocus.xz))) : 1.0; }
 float densLo(vec3 p) { float th = thrQ(); return smoothstep(th, th + 0.05, qAt(p)) * focusK(p); }
 // full detail: the physics decides where the lens is, the procedural layer how it looks up close:
@@ -46,6 +47,13 @@ float dens(vec3 p) {
   vec2 w = normalize(uWindDir + 1e-5);
   float al = dot(p.xz, w), ac = dot(p.xz, vec2(-w.y, w.x));
   float n1 = n3(vec3(al * 0.5, p.y * 4.0, ac * 0.9));
+  // lens plates: in free air (above the cap cloud) the condensate comes in thin sheets with dry gaps,
+  // like a pile of saucers; the sheet height wanders a little with the flow so the edges step, not stripe
+  if (p.y > 2.8) {
+    float ph = (p.y - 3.0) / 0.17 + (n1 - 0.5) * 0.9 + 0.12 * sin(al * 0.35);
+    float band = 0.5 + 0.5 * cos(6.2832 * ph);
+    q *= mix(0.32, 1.0, smoothstep(0.28, 0.72, band));
+  }
   float base = smoothstep(th, th + 0.055 + 0.03 * n1, q) * focusK(p);
   if (uArt < 0.5) return base;
   float f = fbm3(vec3(al * 1.6, p.y * 30.0 + n1 * 5.0, ac * 2.4) + 11.0);
@@ -159,7 +167,7 @@ export function createCloudRenderer(renderer, { scale: scale0 = 1 } = {}) {
     uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() },
     uExag: { value: 2 }, uQmax: { value: 1 }, uDensity: { value: 70 }, uShadowKm: { value: -10 }, uTime: { value: 0 }, uOpacity: { value: 1 }, uArt: { value: 1 }, uSteps: { value: 220 },
     uBMin: { value: new THREE.Vector3(-32, 0, -32) }, uBMax: { value: new THREE.Vector3(32, 8, 32) },
-    uNoise: { value: makeNoise() }, uWindDir: { value: new THREE.Vector2(1, 0) }, uGrow: { value: 1 }, uFocus: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uNoise: { value: makeNoise() }, uWindDir: { value: new THREE.Vector2(1, 0) }, uGrow: { value: 1 }, uGrowRef: { value: 0 }, uFocus: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color(1, 1, 1) },
     uAmbTop: { value: new THREE.Color(0.32, 0.38, 0.6) }, uAmbBot: { value: new THREE.Color(0.18, 0.17, 0.25) },
   };

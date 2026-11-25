@@ -21,7 +21,7 @@ export function createCurtain(scene, groundAt) {
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: { map: { value: tex }, reveal: { value: 1 }, opacity: { value: 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(L, ZT), mat); mesh.renderOrder = 3; mesh.visible = false; scene.add(mesh);
-  let F = null, exag = 2, center = [10, 18.5], ang = 0;
+  let F = null, exag = 2, center = [10, 18.5], ang = 0, span = L;
   const S = { show: 0, amp: 0, gain: 2.5, reveal: 1 }, T = { ...S };
   let drawnKey = '';
 
@@ -31,7 +31,7 @@ export function createCurtain(scene, groundAt) {
     const c0 = c | 0, r0 = r | 0, fx = c - c0, fy = r - r0, b = o * N * N + r0 * N + c0, e = F.eta;
     return e[b] * (1 - fx) * (1 - fy) + e[b + 1] * fx * (1 - fy) + e[b + N] * (1 - fx) * fy + e[b + N + 1] * fx * fy;
   }
-  const X = (s) => (s + L / 2) / L * W, Y = (z) => H - z / ZT * H;
+  const X = (s) => (s + span / 2) / span * W, Y = (z) => H - z / ZT * H;
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
@@ -41,7 +41,7 @@ export function createCurtain(scene, groundAt) {
     ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '22px "IBM Plex Mono", monospace';
     ctx.direction = 'ltr'; ctx.textAlign = 'left';
     for (let z = 1; z < ZT; z++) { ctx.beginPath(); ctx.moveTo(0, Y(z)); ctx.lineTo(W, Y(z)); ctx.stroke(); ctx.fillText(`${z} km`, W - 90, Y(z) - 6); }
-    const prof = F.prof, cos = Math.cos(ang), sin = Math.sin(ang), step = 0.13;
+    const prof = F.prof, cos = Math.cos(ang), sin = Math.sin(ang), step = span / 400;
     // humidity bands from the upstream sounding: why each line has its colour
     const bands = []; let cur = null;
     for (let z = 1500; z <= 6500; z += 50) {
@@ -71,7 +71,7 @@ export function createCurtain(scene, groundAt) {
       const moist = Math.min(1, Math.max(0, (rh - 55) / 30)), need = F.satLift[o];
       if (moist < 0.05 && z0 % 200) continue;            // dry air: every other layer is enough
       const pts = [];
-      for (let s = -L / 2; s <= L / 2 + 1e-6; s += step) {
+      for (let s = -span / 2; s <= span / 2 + 1e-6; s += step) {
         const x = center[0] + cos * s, n = center[1] + sin * s, e = etaAt(o, x, n) * S.amp;
         const z = z0 + e * S.gain, gnd = groundAt(x, n);
         pts.push({ s, z, under: z < gnd + 40, wet: e > need, r: need > 0 && isFinite(need) ? e / need : 0 });
@@ -80,18 +80,31 @@ export function createCurtain(scene, groundAt) {
     }
     // 1) every layer
     // moist layers brighten as the wave brings them toward saturation (r = lift / lift needed)
-    const BINS = [[-9, 0, 'rgba(70,120,210,0.75)'], [0, 0.4, 'rgba(80,165,255,0.92)'], [0.4, 0.7, 'rgba(130,200,255,0.95)'], [0.7, 1, 'rgba(195,232,255,0.98)']];
     for (const ln of lines) {
       const m = ln.moist;
       if (m <= 0.05) { ctx.strokeStyle = 'rgba(224,176,98,0.38)'; ctx.lineWidth = 1.3; path(ln.pts, () => true); ctx.stroke(); continue; }
-      ctx.lineWidth = 1.6 + 4.5 * m;
-      for (const [lo, hi, col] of BINS) { ctx.strokeStyle = col; path(ln.pts, (p) => p.r >= lo && p.r < hi, true); ctx.stroke(); }
+      ctx.lineWidth = 1.6 + 4.5 * m; ctx.lineCap = 'round';
+      // colour glides along the line with how close the air is to saturation: no blocks, one flow
+      const P = ln.pts;
+      for (let k = 1; k < P.length; k++) {
+        const a = P[k - 1], b = P[k]; if (a.under || b.under) continue;
+        const r = Math.max(0, Math.min(1, (a.r + b.r) / 2)), al = r < 0 ? 0.75 : 0.75 + 0.23 * r;
+        ctx.strokeStyle = `rgba(${Math.round(70 + 125 * r)},${Math.round(120 + 112 * r)},${Math.round(210 + 45 * r)},${al.toFixed(2)})`;
+        ctx.beginPath(); ctx.moveTo(X(a.s), Y(a.z / 1000)); ctx.lineTo(X(b.s), Y(b.z / 1000)); ctx.stroke();
+      }
     }
     // 2) condensed parts, glowing white, drawn on top
-    ctx.save(); ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 14;
+    ctx.save(); ctx.shadowColor = 'rgba(255,240,230,0.85)'; ctx.shadowBlur = 18; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const lw = Math.max(2.5, Math.min(6, (0.1 / ZT) * H * 0.55));
     for (const ln of lines) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.97)'; ctx.lineWidth = 7 + 5 * ln.moist;
-      path(ln.pts, (p) => p.wet); ctx.stroke();
+      const P = ln.pts;
+      for (let k = 1; k < P.length; k++) {
+        const a = P[k - 1], b = P[k]; if (!a.wet || !b.wet || a.under || b.under) continue;
+        const over = Math.min(1, Math.max(0, (Math.min(a.r, b.r) - 1) * 2.5));
+        ctx.strokeStyle = `rgba(255,${Math.round(246 - 20 * over)},${Math.round(240 - 40 * over)},${(0.35 + 0.65 * over).toFixed(3)})`;
+        ctx.lineWidth = lw * (0.6 + 0.6 * ln.moist);
+        ctx.beginPath(); ctx.moveTo(X(a.s), Y(a.z / 1000)); ctx.lineTo(X(b.s), Y(b.z / 1000)); ctx.stroke();
+      }
     }
     ctx.restore();
     // band labels, written next to the strip so each label sits on its layer
@@ -118,13 +131,13 @@ export function createCurtain(scene, groundAt) {
   }
   function place() {
     mesh.position.set(center[0], ZT / 2 * exag, -center[1]);
-    mesh.rotation.set(0, ang, 0); mesh.scale.set(1, exag, 1);
+    mesh.rotation.set(0, ang, 0); mesh.scale.set(span / L, exag, 1);
   }
   return {
     S, T, mesh,
     set field(f) { F = f; drawnKey = ''; },
     setExag(e) { exag = e; place(); },
-    setPath(c, a) { center = c; ang = a; place(); drawnKey = ''; },
+    setPath(c, a, len = L) { center = c; ang = a; span = len; place(); drawnKey = ''; },
     target(t) { Object.assign(T, { show: 0, amp: 0, gain: 2.5, reveal: 1 }, t); if (t.restart) S.reveal = 0; },
     update(dt) {
       if (!F) return false;

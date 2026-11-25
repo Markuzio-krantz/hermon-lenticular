@@ -487,3 +487,14 @@ body.focusing #story, body.focusing #lab, body.focusing #legend, body.focusing .
   .dock .maptools { grid-template-columns: repeat(4, 58px); }
 }
 body.focusing .hint { display: none; }
+.focusbar .fade-in { animation: fbIn .6s ease both; }
+@keyframes fbIn { from { opacity: 0; transform: translateY(4px); } }
+.fb-dots button b { transition: width .12s linear; }
+
+.fb-tune { border-top: 1px solid var(--hair); padding-top: 6px; }
+.fb-tune summary { cursor: pointer; color: var(--accent); font-size: .86rem; }
+.fb-tune label { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: .82rem; color: var(--ink-2); margin-top: 6px; }
+.fb-tune input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.fb-tune output { font: .78rem var(--f-data); color: var(--ink); }
+.fb-dims { margin: 8px 0 0; font: .8rem var(--f-data); color: var(--ink); }
+.fb-dims .chg { color: var(--accent); }

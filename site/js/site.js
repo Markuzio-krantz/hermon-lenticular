@@ -81,7 +81,7 @@ function onResult(r) {
   parcels.setField(r); parcels.update(0, 0, state.exag);
   viz.field = r; curtain.field = r; xs.setField(r); xs.setBlockFactor(state.params.blockFactor); chart.setField(r);
   if (!ref && state.preset === 'sunset') { ref = r.diag; lab.setReference(r.diag); }
-  geometry(); anchors = computeAnchors(r); applyCallouts();
+  geometry(); anchors = computeAnchors(r); applyCallouts(); focusRef?.refresh();
   lab.onResult(r, state.params);
   if (state.mode === 'lab') { const v = $('verdict'); say(v.querySelector('strong')?.textContent + '. ' + (v.querySelector('p')?.textContent || '')); }
   S.invalidate();
@@ -107,17 +107,24 @@ function geometry() {
 }
 
 // ---------- callout anchors from the computed field
-let anchors = {};
+let anchors = {}, focusRef = null;
 function computeAnchors(r) {
   const [nx, ny, nz] = r.volDims, dz = 8 / nz, cell = 64 / nx, A = {};
   const L = [0, 0, 0, 0], C = [0, 0, 0, 0]; let pk = 0;
+  const col = new Float32Array(nx * ny), peakV = new Float32Array(nx * ny), peakZ = new Int16Array(nx * ny);
   for (let v = 0; v < nz; v++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const q = r.vol[(v * ny + j) * nx + i]; if (q < 0.02) continue;
     const u = nx / r.inner, x = (i + 0.5) * cell - 32, n = 32 - (j + 0.5) * cell, z = (v + 0.5) * dz, g = r.ground[((j / u) | 0) * r.inner + ((i / u) | 0)] / 1000;
     const T = z - g > 0.9 ? L : C; T[0] += x * q; T[1] += n * q; T[2] = Math.max(T[2], z); T[3] += q;
-    if (T === L && z > 3.2 && z < 4.8 && q > pk) { pk = q; A.lensPeak = [x, n, z]; }
+    if (T === L && z > 3.2 && z < 4.8) { col[j * nx + i] += q; if (q > (peakV[j * nx + i] || 0)) { peakV[j * nx + i] = q; peakZ[j * nx + i] = v; } }
   }
   if (L[3]) A.lens = [L[0] / L[3], L[1] / L[3], L[2]];
+  // the lens to focus on: the biggest cloud mass at lens height (a 5x5 neighbourhood), not a single bright cell
+  for (let j = 2; j < ny - 2; j += 1) for (let i = 2; i < nx - 2; i += 1) {
+    if (!col[j * nx + i]) continue; let m = 0;
+    for (let b = -2; b <= 2; b++) for (let a2 = -2; a2 <= 2; a2++) m += col[(j + b) * nx + i + a2];
+    if (m > pk) { pk = m; A.lensQ = peakV[j * nx + i]; A._pk = [i, j, peakZ[j * nx + i]]; A.lensPeak = [(i + 0.5) * cell - 32, 32 - (j + 0.5) * cell, (peakZ[j * nx + i] + 0.5) * dz]; }
+  }
   if (C[3]) A.cap = [C[0] / C[3], C[1] / C[3], C[2]];
   const a = windAngle(), o = Math.round((3800 - r.outZ[0]) / 100), N = r.inner, need = r.satLift[o];
   let best = -1e9, worst = 1e9, prev = null;
@@ -133,6 +140,15 @@ function computeAnchors(r) {
     prev = e;
   }
   A.birth = A.lens || A.crest;
+  // the focused lens: length along the wind, thickness, and how many separate plates it has
+  if (A._pk) {
+    const [pi, pj, pv] = A._pk, at = (i, j, v) => (i < 0 || j < 0 || v < 0 || i >= nx || j >= ny || v >= nz ? 0 : r.vol[(v * ny + j) * nx + i]);
+    const wa = windAngle(), dx = Math.cos(wa), dy = -Math.sin(wa); let len = 0;
+    for (const sg of [1, -1]) for (let k = 1; k < nx; k++) { if (at(Math.round(pi + sg * dx * k), Math.round(pj + sg * dy * k), pv) < 0.02) break; len += cell; }
+    let plates = 0, inside = false, z0 = null, z1 = null;
+    for (let v = 0; v < nz; v++) { const w = at(pi, pj, v) >= 0.02 && (v + 0.5) * dz > 2.8; if (w && !inside) plates++; if (w) { z0 ??= (v + 0.5) * dz; z1 = (v + 0.5) * dz; } inside = w; }
+    A.lensDims = { len: len + cell, thick: z0 != null ? (z1 - z0 + dz) : 0, plates, base: z0 };
+  }
   A.moistLayer = [HERMON[0] - Math.cos(a) * 18, HERMON[1] - Math.sin(a) * 18, 3.8];
   A.upstream = [-24, 8, 5.5]; A.box = [-32, -32, 0.6]; A.shadow = [-6, -12, 0.5];
   const ri = r.rotor.findIndex(v => v < 0);
@@ -679,7 +695,10 @@ function frame(now) {
 }
 
 // ---------- focus on one lens, inside the live model
-const focus = createFocus({ S, clouds, viz, curtain, state, windAngle, getAnchors: () => anchors, say,
+const focus = createFocus({ S, clouds, viz, curtain, state, windAngle,
+  slice: (c, len) => { const a = windAngle(); curtain.setPath(c, a, len); viz.setJourney([c[0] - Math.cos(a) * 1.5, c[1] - Math.sin(a) * 1.5], a); },
+  unslice: () => geometry(),
+  tune: (k, v) => { state.params[k] = v; state.preset = null; lab.sync(); compute(); }, getAnchors: () => anchors, say,
   apply: () => {
     const v = viz.T, c = curtain.T;
     stepBase = { stack: v.stack || 1, moist: v.moist || 0.7, curtain: c.show || 1, clouds: 1, ampSet: true };
@@ -698,6 +717,7 @@ function enterFocus() {
   if (focus.isOn) return focus.exit();
   if (!focus.enter()) toast('אין עדשה במצב הנוכחי. נסו את ערב 19.11 במעבדה, או שלב אחר בסיפור.');
 }
+focusRef = focus;
 $('focusBtn').addEventListener('click', enterFocus);
 $('studioCta').addEventListener('click', enterFocus);
 
@@ -750,4 +770,4 @@ if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !fo
 requestAnimationFrame(frame);
 setTimeout(() => $('hint').classList.add('gone'), 9000);
 setTimeout(() => { $('loader').classList.add('done'); setTimeout(() => $('loader').remove(), 700); }, 400);
-window.__lent = { S, state, viz, get field() { return field; }, go, setMode };
+window.__lent = { S, state, viz, curtain, clouds, get field() { return field; }, get anchors() { return anchors; }, go, setMode };

@@ -86,6 +86,12 @@
 <section class="card focusbar chrome" id="focusBar" aria-label="מיקוד בעדשה" hidden>
   <div class="fb-head"><small id="fbNo"></small><button class="info" type="button" id="fbExit" aria-label="יציאה מהמיקוד">×</button></div>
   <h2 id="fbTitle"></h2><p id="fbLine"></p>
+  <details class="fb-tune" id="fbTune"><summary>שנו את התנאים וראו את העדשה משתנה</summary>
+    <label>רוח <output id="fbo-windScale"></output><input type="range" id="fb-windScale" min="0.4" max="1.8" step="0.05"></label>
+    <label>יציבות <output id="fbo-stabilityScale"></output><input type="range" id="fb-stabilityScale" min="0.3" max="1.8" step="0.05"></label>
+    <label>לחות בשכבת העדשה <output id="fbo-lensBoost"></output><input type="range" id="fb-lensBoost" min="0" max="25" step="1"></label>
+    <p class="fb-dims" id="fbDims" aria-live="polite"></p>
+  </details>
   <div class="fb-nav">
     <button class="btn" id="fbPrev" type="button" aria-label="השלב הקודם"><svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
     <ol class="fb-dots" id="fbDots"></ol>
