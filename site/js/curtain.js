@@ -121,7 +121,7 @@ export function createCurtain(scene, groundAt) {
     mesh.rotation.set(0, ang, 0); mesh.scale.set(1, exag, 1);
   }
   return {
-    S, T,
+    S, T, mesh,
     set field(f) { F = f; drawnKey = ''; },
     setExag(e) { exag = e; place(); },
     setPath(c, a) { center = c; ang = a; place(); drawnKey = ''; },

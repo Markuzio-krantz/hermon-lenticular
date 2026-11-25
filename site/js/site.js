@@ -11,6 +11,7 @@ import { STEPS } from './story.js';
 import { initLab, startTour } from './lab.js';
 import { initLearn } from './learn.js';
 import { initSiteTour } from './sitetour.js';
+import { createFocus } from './focus.js';
 import { fetchWindow, fetchDay, rowsAt, potential, POINT } from './openmeteo.js';
 
 const $ = (id) => document.getElementById(id);
@@ -109,11 +110,12 @@ function geometry() {
 let anchors = {};
 function computeAnchors(r) {
   const [nx, ny, nz] = r.volDims, dz = 8 / nz, cell = 64 / nx, A = {};
-  const L = [0, 0, 0, 0], C = [0, 0, 0, 0];
+  const L = [0, 0, 0, 0], C = [0, 0, 0, 0]; let pk = 0;
   for (let v = 0; v < nz; v++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const q = r.vol[(v * ny + j) * nx + i]; if (q < 0.02) continue;
     const u = nx / r.inner, x = (i + 0.5) * cell - 32, n = 32 - (j + 0.5) * cell, z = (v + 0.5) * dz, g = r.ground[((j / u) | 0) * r.inner + ((i / u) | 0)] / 1000;
     const T = z - g > 0.9 ? L : C; T[0] += x * q; T[1] += n * q; T[2] = Math.max(T[2], z); T[3] += q;
+    if (T === L && z > 3.2 && z < 4.8 && q > pk) { pk = q; A.lensPeak = [x, n, z]; }
   }
   if (L[3]) A.lens = [L[0] / L[3], L[1] / L[3], L[2]];
   if (C[3]) A.cap = [C[0] / C[3], C[1] / C[3], C[2]];
@@ -396,7 +398,7 @@ function go(i) {
   calloutIds = s.callouts || []; applyCallouts();
   legend(s.id);
   $('photoBtn').hidden = !s.photo; showPhoto(false);
-  $('studioCta').hidden = !['moist', 'birth', 'through', 'light'].includes(s.id);
+  $('studioCta').hidden = !['wave', 'moist', 'birth', 'through'].includes(s.id);
   setHash(`s${step + 1}`);
   say(`שלב ${step + 1} מתוך ${STEPS.length}: ${s.title}. ${s.line}`);
   applyVisuals(); setView(s.view); syncLayers(); fitFrame();
@@ -633,9 +635,10 @@ function autoDowngrade() {
 }
 function frame(now) {
   requestAnimationFrame(frame);
-  if (document.hidden || studio?.isOpen) return;
+  if (document.hidden) return;
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   let moving = S.updateFly(now);
+  if (focus.update(now, S.camera)) moving = true;
   S.controls.update();
   let sunGoal = tw.sunT;
   if (tw.loop && state.mode === 'story') { const [a, b] = tw.loop, ph = ((now - tw.loopT0) / 10000) % 1; sunGoal = a + (b - a) * (0.5 - 0.5 * Math.cos(ph * 2 * Math.PI)); }
@@ -675,19 +678,51 @@ function frame(now) {
   if (state.mode === 'lab' && $('research').open && now - lastXs > 40) { xs.draw(); lastXs = now; }
 }
 
-// ---------- lens studio (loaded on first use)
-let studio = null;
-async function openStudio(from) {
-  if (playing) setPlaying(false);
-  if (!studio) {
-    const { createStudio } = await import('./studio.js');
-    studio = createStudio($('studio'), { mobile, quality: qualityLevel, onClose: () => { (from || $('studioBtn')).focus?.(); S.invalidate(); setHash(state.mode === 'lab' ? labHash() : `s${step + 1}`); } });
-  } else studio.setQuality(qualityLevel);
-  studio.open(); setHash('studio');
-  if (location.search.includes('capture')) window.__studio = studio;
+// ---------- focus on one lens, inside the live model
+const focus = createFocus({ S, clouds, viz, curtain, state, windAngle, getAnchors: () => anchors, say,
+  apply: () => {
+    const v = viz.T, c = curtain.T;
+    stepBase = { stack: v.stack || 1, moist: v.moist || 0.7, curtain: c.show || 1, clouds: 1, ampSet: true };
+    flowMode = 'curtain'; calloutIds = []; viz.setCallouts([]); S.labels.focus(null);
+    applyVisuals(); layerTargets(); syncLayers(); S.invalidate();
+  },
+  onEnter: () => { if (playing) setPlaying(false); closeFloating(); setDock(null); S.setFrameOffset(0, 0); $('focusBtn').setAttribute('aria-pressed', 'true'); setHash('focus'); },
+  onExit: () => {
+    $('focusBtn').setAttribute('aria-pressed', 'false'); clouds.uniforms.uGrow.value = 1;
+    if (state.mode === 'lab') { setMode('lab'); } else go(step);
+    fitFrame();
+  },
+});
+function enterFocus() {
+  menu(false);
+  if (focus.isOn) return focus.exit();
+  if (!focus.enter()) toast('אין עדשה במצב הנוכחי. נסו את ערב 19.11 במעבדה, או שלב אחר בסיפור.');
 }
-$('studioBtn').addEventListener('click', () => openStudio($('studioBtn')));
-$('studioCta').addEventListener('click', () => openStudio($('studioCta')));
+$('focusBtn').addEventListener('click', enterFocus);
+$('studioCta').addEventListener('click', enterFocus);
+
+// ---------- one menu, two docks: everything else stays off the map until asked for
+function menu(open) {
+  const m = $('menu'); open = open ?? m.hidden; m.hidden = !open; $('menuBtn').setAttribute('aria-expanded', String(open));
+  if (open) { setDock(null); m.querySelector('button:not([style*="none"])')?.focus(); }
+}
+$('menuBtn').addEventListener('click', () => menu());
+for (const b of $('menu').querySelectorAll('button')) b.addEventListener('click', () => {
+  menu(false);
+  if (b.dataset.go === 'focus') enterFocus();
+  if (b.dataset.go === 'lab') $('modeBtn').click();
+});
+function setDock(which) {
+  for (const [id, peek] of [['layersPanel', 'layersPeek'], ['toolsPanel', 'toolsPeek']]) {
+    const open = which === id; $(id).hidden = !open; $(peek).setAttribute('aria-expanded', String(open));
+  }
+  if (which) menu(false);
+}
+$('layersPeek').addEventListener('click', () => setDock($('layersPanel').hidden ? 'layersPanel' : null));
+$('toolsPeek').addEventListener('click', () => setDock($('toolsPanel').hidden ? 'toolsPanel' : null));
+// touching the map folds everything away
+S.renderer.domElement.addEventListener('pointerdown', () => { setDock(null); menu(false); if (!$('qualityMenu').hidden) { $('qualityMenu').hidden = true; } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null); } });
 
 // ---------- start
 const startHash = location.hash;
@@ -701,17 +736,18 @@ if (linked?.lab) {
   if (Object.keys(L).length) { state.preset = L.p && Object.keys(L).length === 1 ? L.p : null; lab.sync(); }
   compute(); setHash(labHash());
 } else { go(linked?.step ?? 0); compute(); }
-if (startHash === '#studio') openStudio();
+if (startHash === '#focus' || startHash === '#studio') setTimeout(enterFocus, 2500);
 // opening tour: once on the first visit (not on shared links), always from the "סיור" button
-const siteTour = initSiteTour({ button: $('siteTourBtn'), onStart: () => {
-  if (studio?.isOpen) studio.close();
+const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDock(d); menu(false); }, onMenu: (o) => menu(o), onStart: () => {
+  if (focus.isOn) focus.exit();
   if (state.mode !== 'story') setMode('story');
   if (learn.isOpen) learn.close();
   if (document.body.classList.contains('clean')) setClean(false);
   if ($('storyMin').getAttribute('aria-pressed') === 'true') $('storyMin').click();
   if (playing) setPlaying(false);
 } });
-if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !studio?.isOpen) siteTour.start(); }, 2200);
+if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !focus.isOn) siteTour.start(); }, 2200);
 requestAnimationFrame(frame);
+setTimeout(() => $('hint').classList.add('gone'), 9000);
 setTimeout(() => { $('loader').classList.add('done'); setTimeout(() => $('loader').remove(), 700); }, 400);
 window.__lent = { S, state, viz, get field() { return field; }, go, setMode };

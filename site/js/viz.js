@@ -125,7 +125,7 @@ export function createViz(scene, groundAt) {
 
   let shapedAmp = -1, shapedExag = -1;
   return {
-    S, T,
+    S, T, group,
     set field(f) { F = f; shapedAmp = -1; },
     setExag(e) { exag = e; shapedExag = -1; },
     setJourney(center, ang) { jC = center; jAng = ang; shapedAmp = -1; },

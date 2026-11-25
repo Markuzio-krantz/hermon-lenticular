@@ -28,34 +28,46 @@
 
 <div class="loader" id="loader" role="status"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><ellipse cx="16" cy="11" rx="9" ry="2.6"/><ellipse cx="16" cy="16.5" rx="12" ry="3"/><ellipse cx="16" cy="22" rx="8" ry="2.4"/></g></svg><span id="loaderTxt">טוען את המפה…</span></div>
 
-<header class="hud-top">
+<header class="hud-top chrome">
   <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="16" cy="11" rx="9" ry="2.6"/><ellipse cx="16" cy="16.5" rx="12" ry="3"/><ellipse cx="16" cy="22" rx="8" ry="2.4"/></g></svg><span class="brand-t"><b>ענן שעומד במקום לעומת אוויר שזז</b><small>איך נוצרים ענני עדשה, שלב אחר שלב</small></span></div>
   <div class="hud-actions">
-    <button class="chip accent" id="studioBtn" type="button" aria-haspopup="dialog">סטודיו העדשה</button>
-    <button class="chip ghost" id="learnBtn" type="button" aria-controls="learn">ללמוד</button>
-    <button class="chip" id="modeBtn" type="button" aria-pressed="false">מעבדה</button>
-    <button class="chip ghost" id="aboutBtn" type="button" aria-haspopup="dialog">על הפרויקט</button>
+    <button class="chip accent d-only" id="focusBtn" type="button" aria-pressed="false">מיקוד בעדשה</button>
+    <button class="chip d-only" id="modeBtn" type="button" aria-pressed="false">מעבדה</button>
+    <button class="chip ghost menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>תפריט</span></button>
   </div>
+  <nav class="menu" id="menu" aria-label="תפריט" hidden>
+    <button class="m-only" type="button" data-go="focus">מיקוד בעדשה<small>עדשה אחת מקרוב: האוויר מגיע, עולה ומתעבה</small></button>
+    <button class="m-only" type="button" data-go="lab" id="menuLab">מעבדה<small>משנים את האטמוספרה בעצמכם</small></button>
+    <button type="button" id="learnBtn" aria-controls="learn">ללמוד<small>נושאים קצרים, כל אחד עם ניסוי</small></button>
+    <button type="button" id="aboutBtn" aria-haspopup="dialog">על הפרויקט<small>המדע, הפיתוח והקוד</small></button>
+    <button type="button" id="siteTourBtn">סיור באתר<small>איפה כל דבר, בחצי דקה</small></button>
+  </nav>
 </header>
 
-<nav class="views" id="views" aria-label="נקודת מבט">
+<div class="docks chrome" id="docks">
+  <div class="dock" id="layersDock">
+    <button class="peek" id="layersPeek" type="button" aria-expanded="false" aria-controls="layersPanel">שכבות<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="dock-panel" id="layersPanel" hidden><p class="dock-t">מה מוצג על המפה</p><div class="layer-menu" id="layerMenu" role="group" aria-label="מה מוצג במפה"></div></div>
+  </div>
+  <div class="dock" id="toolsDock">
+    <button class="peek" id="toolsPeek" type="button" aria-expanded="false" aria-controls="toolsPanel">כלים<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="dock-panel" id="toolsPanel" hidden><p class="dock-t">נקודת מבט</p><nav class="views" id="views" aria-label="נקודת מבט">
   <button type="button" data-v="hula">מהעמק</button><button type="button" data-v="overview">מבט על</button><button type="button" data-v="hermon">חרמון</button><button type="button" data-v="side">חתך</button><button type="button" data-v="region">אזור</button>
-</nav>
-<div class="maptools" id="maptools" role="toolbar" aria-label="כלי מפה">
-  <button type="button" data-t="in" aria-label="התקרבות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-  <button type="button" data-t="out" aria-label="התרחקות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
-  <button type="button" data-t="reset" aria-label="חזרה לנקודת המבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
+</nav><p class="dock-t">כלים</p><div class="maptools" id="maptools" role="toolbar" aria-label="כלי מפה">
+  <button type="button" data-t="in" aria-label="התקרבות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>קרוב</span></button>
+  <button type="button" data-t="out" aria-label="התרחקות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg><span>רחוק</span></button>
+  <button type="button" data-t="reset" aria-label="חזרה לנקודת המבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg><span>איפוס</span></button>
   <button type="button" data-t="views" class="views-btn" aria-expanded="false" aria-controls="views" aria-label="נקודות מבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
-  <button type="button" data-t="focus" class="focus-btn" aria-pressed="false" aria-label="הסתרת הכפתורים: רק המפה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.1 3.8M6.2 7.6C3.6 9.4 2 12 2 12s3.6 6 10 6c1.4 0 2.7-.3 3.8-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
-  <button type="button" data-t="quality" class="quality-btn" aria-expanded="false" aria-controls="qualityMenu" aria-label="איכות התצוגה"><b id="qualityTag">אוטו</b></button>
-  <button type="button" id="siteTourBtn" class="tour-btn" aria-label="סיור באתר: איפה כל דבר"><b>?</b></button>
-  <button type="button" data-t="share" aria-label="העתקת קישור למה שמוצג עכשיו"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button>
+  <button type="button" data-t="focus" class="focus-btn" aria-pressed="false" aria-label="הסתרת הכפתורים: רק המפה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.1 3.8M6.2 7.6C3.6 9.4 2 12 2 12s3.6 6 10 6c1.4 0 2.7-.3 3.8-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><span>רק מפה</span></button>
+  <button type="button" data-t="quality" class="quality-btn" aria-expanded="false" aria-controls="qualityMenu" aria-label="איכות התצוגה"><b id="qualityTag">אוטו</b><span>איכות</span></button>
+  <button type="button" data-t="share" aria-label="העתקת קישור למה שמוצג עכשיו"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>קישור</span></button>
+</div></div>
+  </div>
 </div>
-<div class="layer-menu" id="layerMenu" role="group" aria-label="מה מוצג במפה"></div>
 <div class="layer-panel" id="layerPanel" role="dialog" aria-label="שכבות המפה: הסבר ושליטה" hidden></div>
 <div class="probe" id="probe" role="dialog" aria-live="polite" hidden></div>
 <p class="hint" id="hint">גרירה: סיבוב · שתי אצבעות או גלגלת: זום · הקשה על המפה או על ענן: מה קורה שם</p>
-<div class="legend" id="legend" aria-live="polite"></div>
+<div class="chrome legend" id="legend" aria-live="polite"></div>
 <div class="busy" id="busy" role="status" hidden>מחשב את הגל…</div>
 <figure class="pip" id="pip" hidden><img id="pipImg" alt=""><figcaption id="pipCap"></figcaption><button class="x" id="pipClose" type="button" aria-label="סגירת הצילום">×</button></figure>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -67,11 +79,22 @@
   <button type="button" role="radio" data-q="low">חסכונית<small>הכי קל, לטלפון או למחשב ישן</small></button>
 </div>
 <aside class="learn" id="learn" aria-labelledby="learnTitle" hidden></aside>
-<footer class="credits">פיתוח: <a href="https://mudu.me" target="_blank" rel="noopener">מארק בורשטיין (mudu.me)</a> · מחקר: <a href="https://www.linkedin.com/in/bennydrobot/" target="_blank" rel="noopener">בני דרובוט</a> · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></footer>
+<footer class="chrome credits">פיתוח: <a href="https://mudu.me" target="_blank" rel="noopener">מארק בורשטיין (mudu.me)</a> · מחקר: <a href="https://www.linkedin.com/in/bennydrobot/" target="_blank" rel="noopener">בני דרובוט</a> · צילום: <a href="https://www.instagram.com/roy.kasher/" target="_blank" rel="noopener">רועי כשר</a></footer>
 <p class="sr-only" id="srStatus" aria-live="polite"></p>
 
+<div class="spot" id="spot" aria-hidden="true"></div>
+<section class="card focusbar chrome" id="focusBar" aria-label="מיקוד בעדשה" hidden>
+  <div class="fb-head"><small id="fbNo"></small><button class="info" type="button" id="fbExit" aria-label="יציאה מהמיקוד">×</button></div>
+  <h2 id="fbTitle"></h2><p id="fbLine"></p>
+  <div class="fb-nav">
+    <button class="btn" id="fbPrev" type="button" aria-label="השלב הקודם"><svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>
+    <ol class="fb-dots" id="fbDots"></ol>
+    <button class="btn" id="fbPlay" type="button" aria-pressed="true" aria-label="השהיה"></button>
+    <button class="btn primary" id="fbNext" type="button" aria-label="השלב הבא"><svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button>
+  </div>
+</section>
 <!-- story: one continuous timeline -->
-<section class="card story" id="story" aria-label="איך נוצרת עדשה, שלב אחר שלב">
+<section class="chrome card story" id="story" aria-label="איך נוצרת עדשה, שלב אחר שלב">
   <div class="timeline" role="group" aria-label="שלבים">
     <button class="play" id="play" type="button" aria-pressed="false" aria-label="הפעלה אוטומטית"></button>
     <ol class="segs" id="segs"></ol>
@@ -83,7 +106,7 @@
     <p id="stepLine"></p>
     <details id="stepMore"><summary>לעומק</summary><p></p><button class="chip ghost" id="stepLearn" type="button" hidden></button></details>
     <div class="legend-inline" id="legendInline" aria-hidden="true"></div>
-    <button class="chip ghost studio-cta" id="studioCta" type="button" hidden>צפו בהיווצרות מקרוב</button>
+    <button class="chip ghost studio-cta" id="studioCta" type="button" hidden>מיקוד בעדשה: מקרוב, שלב אחר שלב</button>
     <button class="chip ghost photo-btn" id="photoBtn" type="button" aria-pressed="false" hidden>הצילום המקורי</button>
   </div>
   <div class="step-nav">
@@ -93,7 +116,7 @@
 </section>
 
 <!-- lab -->
-<aside class="card lab" id="lab" aria-labelledby="labTitle" hidden>
+<aside class="chrome card lab" id="lab" aria-labelledby="labTitle" hidden>
   <div class="lab-head">
     <button class="handle" id="sheetBtn" type="button" aria-label="הרחבה או כיווץ של המעבדה"><i></i></button>
     <h2 id="labTitle">המעבדה</h2>
@@ -203,10 +226,9 @@
     <tbody>
       <tr><td>איך מחשבים את הגל</td><td>תורת גלי הרים לינארית בתלת-ממד, בשכבות של 100 מ', בפתרון ספקטרלי (FFT)</td><td>מודל מזג אוויר מלא (כמו WRF) מדויק יותר אבל דורש שעות על שרת; כאן החישוב לוקח חצי שנייה בדפדפן ומגיב לכל מחוון</td></tr>
       <tr><td>איך מציירים ענן במפה</td><td>הפיזיקה קובעת איפה יש מים מעובים; ירי קרניים (ray marching) על כרטיס המסך מצייר אותם, ושכבה פרוצדורלית מוסיפה סיבים ושוליים מתפוררים</td><td>מודלים מוכנים או ספרייטים נראים יפה אבל לא משתנים כשמשנים את האטמוספרה</td></tr>
-      <tr><td>איך מראים את ההיווצרות מקרוב</td><td>מודל עדשה פרוצדורלי: ערימת לוחות בפרופיל של עדשה, סיבים לאורך הרוח, גלים בתחתית, ואור שקיעה עם פיזור רב-פעמי</td><td>נפח מהפיזיקה ברזולוציה של 125 מ' גס מדי לקרבה כזו</td></tr>
+      <tr><td>איך מראים את ההיווצרות מקרוב</td><td>מיקוד בעדשה בתוך המודל עצמו: המצלמה ניגשת לעדשה החזקה ביותר שהפיזיקה בנתה, הסביבה מתעמעמת, וחמישה שלבים מראים אוויר שמגיע, עולה, מתעבה ומשאיר לוחות</td><td>סביבה נפרדת או סרטון מוכן מנותקים מהנתונים; כאן כל מה שרואים מחושב מאותו ערב</td></tr>
       <tr><td>איך שומרים על חדות בלי להעמיס</td><td>ציור רק כשמשהו זז, רזולוציה שמסתגלת לקצב המכשיר, וצבירה של כמה תמונות כשהכול עומד</td><td>ציור קבוע של 60 תמונות בשנייה מחמם טלפונים ומפיל מחשבים חלשים</td></tr>
       <tr><td>הנוף</td><td>גבהים מ-SRTM, תמונת לוויין Sentinel-2, ומ-OpenStreetMap מים, יערות, מטעים ויישובים</td><td>מפת אריחים חיה לא מאפשרת להאיר את ההר בשמש של אותו רגע</td></tr>
-      <tr><td>מסכים חלשים וטלפונים</td><td>גרסה קולנועית בסטודיו: אותו מודל בדיוק, מצויר מראש באיכות מלאה (12 דגימות לכל תמונה, 576 תמונות) לסרטון של 1.4 MB</td><td>ציור חי באיכות מלאה דורש כרטיס מסך חזק; כך כל מסך מקבל את התוצאה הטובה ביותר, וכפתור אחד עובר לגרסה החיה</td></tr>
       <tr><td>הדמיות איכות</td><td>Blender (Cycles) לתמונות הסטילס, מאותם גבהים ועננים</td><td>&nbsp;</td></tr>
     </tbody>
   </table></div>
@@ -217,8 +239,8 @@
     <li>הדמיות Blender ראשונות מהעמק ומהאוויר.</li>
     <li>אתר: מפה רחבה של 128 ק"מ, סיפור ב-12 שלבים, מעבדה, נושאי לימוד ונתונים חיים מ-Open-Meteo.</li>
     <li>ליטוש: נגישות, מובייל, ביצועים, שכבות מוסברות, צילומים מקוריים.</li>
-    <li>מודל העדשה הפרוצדורלי, סטודיו העדשה, ופרטי קרקע מ-OpenStreetMap.</li>
-    <li>גרסה קולנועית מצוירת מראש, סיור פתיחה, ועמוד הפיתוח הזה.</li>
+    <li>פרטי עננים פרוצדורליים ופרטי קרקע מ-OpenStreetMap.</li>
+    <li>מיקוד בעדשה בתוך המודל, מסך נקי עם מגירות מתקפלות, סיור פתיחה, ועמוד הפיתוח הזה.</li>
   </ol>
   <h3>במה משתמשים</h3>
   <ul class="stack">
@@ -248,7 +270,6 @@
   </div>
 </dialog>
 
-<section id="studio" class="studio" role="dialog" aria-modal="true" aria-label="סטודיו העדשה" hidden></section>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",

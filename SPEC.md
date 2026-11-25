@@ -32,12 +32,10 @@ Audience: curious general public in Hebrew, first; enough depth for students of 
 - Earth's shadow: anything below R(1/cos e − 1) is unlit when the sun is e° below the horizon.
 - On-demand rendering, adaptive resolution, three quality tiers with automatic step-down, and a sharp still frame at full resolution when nothing moves.
 
-**Lens studio**:
-- One lens in its own frame (x along the wind, y up, km). Stacked plates; each plate has a lens profile (domed top, flatter base), fibres in thin sheared sheets, ripples across the wind on its underside, a crisp upwind edge and a ragged downwind edge. The texture is advected by the wind while the shape stays put.
-- Growth per plate g_i blooms from the crest outward on a 26 s timeline in five captioned stages.
-- Lighting: light march toward the sun, four scattering orders (Hillaire-style), dual-lobe Henyey–Greenstein, powder term, lavender ambient, warm ground bounce; sunset sky with Earth's shadow and the pink belt; ray-marched ridge below.
-- Progressive accumulation when still; pixel budget per frame and context-loss recovery to protect weak GPUs.
-- Cinematic version: the same renderer driven offline, 576 frames at 1280 × 720, 12 samples each, encoded to H.264 (1.4 MB). Default on phones and on the light tier.
+**Focus on a lens**:
+- The strongest lens cell between 3.2 and 4.8 km is the subject. The camera stands side-on to the wind, about 13 km away; other clouds fade (density × 0.1 beyond 7 km), a screen-space spotlight dims the map.
+- Five stages on the formation curtain through the lens: air arrives (flat layers, humidity strip), rises on the wave (the inversion as the spring), condenses (moist lines whiten at the crest; the cloud grows from its wettest core outward by lowering a condensate threshold), the plates that remain, and the air passing through (one tracked parcel).
+- Everything shown is the live model of the selected atmosphere, so the lab can change what the focus shows.
 
 ## 5. Data preparation
 
@@ -54,10 +52,11 @@ All maps share one grid: centre 33.25 N 35.72 E, 128 × 128 km, row 0 north.
 
 - Story: 12 steps with previous / next, keyboard arrows, a segmented timeline, auto-play, and a collapse button that turns the card into a slim bar with arrows.
 - Layers: clouds, air flow, moist layer, air layers (θ surfaces), formation curtain, rotors, wind column, labels; each with an explanation and controls.
-- Map: orbit, zoom, preset views, tap-to-probe, clean mode (H), quality menu, shareable links (`#s4`, `#lab=…`, `#studio`).
-- Opening tour on the first visit, skippable, replayable from the "?" button and from About.
+- Map: orbit, zoom, preset views, tap-to-probe, clean mode (H), quality menu, shareable links (`#s4`, `#lab=…`, `#focus`).
+- Calm screen: one menu, and two drawers (layers, tools) that fold to labelled tabs with arrows; touching the map folds everything.
+- Opening tour on the first visit: the screen empties and each step brings back only what it explains. Skippable, replayable from the menu and from About.
 - Hebrew right-to-left throughout, keyboard and screen-reader support, reduced motion respected.
 
 ## 7. Limits
 
-The model is linear: no turbulence, no real rotors, no convection. The blocking strength (60%) and the extra 10% moisture at 3.8 km are calibrated to the observation. The studio lens is procedural and shaped by the physics, not computed by it.
+The model is linear: no turbulence, no real rotors, no convection. The blocking strength (60%) and the extra 10% moisture at 3.8 km are calibrated to the observation. The fine cloud texture (fibres, frayed rims) is procedural on top of the computed condensate.

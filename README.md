@@ -15,7 +15,7 @@ Live: **https://hermon-lenticular.pages.dev**
 - **Story**: twelve steps, from the photo to the physics, each with its own view and layers on the map.
 - **Lab**: change wind, stability, moisture and the model's assumptions, and watch the lenses grow, shrink, stack or vanish. Real days come from Open-Meteo.
 - **Learn**: short topics (stability, standing waves, saturation, Froude number, Scorer parameter, Earth's shadow, ice, the mountain-cloud family, the model).
-- **Lens studio**: one lens up close, forming plate by plate in a procedural ray-marched model, with a pre-rendered cinematic version for weaker screens.
+- **Focus on a lens**: inside the live model, the camera goes to the strongest lens the physics built, the map dims around it, and five stages show the air arriving, rising on the wave, condensing, the plates that remain, and the air passing through.
 
 ## Run it locally
 
@@ -38,7 +38,7 @@ node tools/test_engine.mjs          # every preset, timings and diagnostics
 | Path | What |
 |------|------|
 | `web/js/` | the model: sounding, mountain-wave solver, condensate, diagnostics, cloud ray marcher |
-| `site/` | the public site: page, styles, story, lab, learn, studio, map stage |
+| `site/` | the public site: page, styles, story, lab, learn, lens focus, map stage |
 | `tools/` | data preparation (heights, satellite, land cover), tests, site build |
 | `blender/` | Blender scene builder for the still renders |
 | `web/data/` | prepared terrain, imagery and land cover |

@@ -14,4 +14,3 @@ web/data/height_1024.f32
 hermon-lenticular/
 !web/data/*.webp
 web/data/wide_height_1024.f32
-!web/renders/*.mp4

@@ -22,7 +22,7 @@ vec2 boxHit(vec3 ro, vec3 rd, vec3 bmin, vec3 bmax) {
   return vec2(max(max(tmin.x, tmin.y), tmin.z), min(min(tmax.x, tmax.y), tmax.z));
 }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-uniform highp sampler3D uNoise; uniform vec2 uWindDir;
+uniform highp sampler3D uNoise; uniform vec2 uWindDir; uniform float uGrow; uniform vec4 uFocus;
 float n3(vec3 p) { return texture(uNoise, p * (1.0 / 32.0)).r; }
 float fbm3(vec3 p) { return (n3(p) * 0.5 + n3(p * 2.03 + 1.7) * 0.25 + n3(p * 4.1 + 5.3) * 0.125) / 0.875; }
 // raw cloud water (g/kg) at p in REAL km (x east, y up, z south)
@@ -33,16 +33,20 @@ float qAt(vec3 p) {
   return b * b * uQmax;
 }
 // cheap version for light, shade and normals: the smooth shell only
-float densLo(vec3 p) { return smoothstep(0.003, 0.05, qAt(p)); }
+// growth: the cloud appears from its wettest core outward; focus: other clouds step back
+float thrQ() { return mix(uQmax * 0.85, 0.003, clamp(uGrow, 0.0, 1.0)); }
+float focusK(vec3 p) { return uFocus.w > 0.0 ? mix(0.1, 1.0, smoothstep(uFocus.w + 5.0, uFocus.w, length(p.xz - uFocus.xz))) : 1.0; }
+float densLo(vec3 p) { float th = thrQ(); return smoothstep(th, th + 0.05, qAt(p)) * focusK(p); }
 // full detail: the physics decides where the lens is, the procedural layer how it looks up close:
 // fibres stretched along the wind in thin sheets, eroding the rim into wisps, and ribbons in height
 float dens(vec3 p) {
   float q = qAt(p);
-  if (q < 0.002) return 0.0;
+  float th = thrQ();
+  if (q < max(th, 0.002)) return 0.0;
   vec2 w = normalize(uWindDir + 1e-5);
   float al = dot(p.xz, w), ac = dot(p.xz, vec2(-w.y, w.x));
   float n1 = n3(vec3(al * 0.5, p.y * 4.0, ac * 0.9));
-  float base = smoothstep(0.003, 0.055 + 0.03 * n1, q);
+  float base = smoothstep(th, th + 0.055 + 0.03 * n1, q) * focusK(p);
   if (uArt < 0.5) return base;
   float f = fbm3(vec3(al * 1.6, p.y * 30.0 + n1 * 5.0, ac * 2.4) + 11.0);
   float rib = 0.55 + 0.45 * smoothstep(0.25, 0.75, n3(vec3(al * 0.42, p.y * 21.0 + n1 * 3.0, ac * 0.5)));
@@ -155,7 +159,7 @@ export function createCloudRenderer(renderer, { scale: scale0 = 1 } = {}) {
     uProjInv: { value: new THREE.Matrix4() }, uViewInv: { value: new THREE.Matrix4() },
     uExag: { value: 2 }, uQmax: { value: 1 }, uDensity: { value: 70 }, uShadowKm: { value: -10 }, uTime: { value: 0 }, uOpacity: { value: 1 }, uArt: { value: 1 }, uSteps: { value: 220 },
     uBMin: { value: new THREE.Vector3(-32, 0, -32) }, uBMax: { value: new THREE.Vector3(32, 8, 32) },
-    uNoise: { value: makeNoise() }, uWindDir: { value: new THREE.Vector2(1, 0) },
+    uNoise: { value: makeNoise() }, uWindDir: { value: new THREE.Vector2(1, 0) }, uGrow: { value: 1 }, uFocus: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunColor: { value: new THREE.Color(1, 1, 1) },
     uAmbTop: { value: new THREE.Color(0.32, 0.38, 0.6) }, uAmbBot: { value: new THREE.Color(0.18, 0.17, 0.25) },
   };
