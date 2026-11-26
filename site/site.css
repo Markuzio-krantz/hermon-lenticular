@@ -520,3 +520,16 @@ body.focusing .hint { display: none; }
 #stage > canvas:not(.volume) { position: relative; z-index: 1; }
 .dock .maptools #volBtn[aria-pressed="true"], .dock .maptools #cm1Btn[aria-pressed="true"] { background: rgb(255 159 184 / .22); }
 @media (min-width: 900px) { .legend { left: auto !important; right: auto !important; inset-inline-start: 50% !important; transform: translateX(50%); bottom: 18px !important; top: auto !important; } }
+
+/* the kids lab, always one tap away in a corner */
+.kids-corner { position: fixed; left: 20px; bottom: 20px; z-index: 40; display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 10px;
+  border-radius: 999px; text-decoration: none; color: #2a1630; background: linear-gradient(135deg, #ffd36e, #ff9fb8 60%, #b9a2ff);
+  box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 2px rgb(255 255 255 / .35) inset; font-family: inherit; transition: transform .2s ease, box-shadow .2s ease; }
+.kids-corner:hover, .kids-corner:focus-visible { transform: translateY(-2px) scale(1.04); box-shadow: 0 10px 28px rgb(0 0 0 / .45), 0 0 0 2px #fff inset; }
+.kids-corner .kc-icon { font-size: 1.6rem; line-height: 1; animation: kc-bob 2.6s ease-in-out infinite; }
+.kids-corner .kc-text { display: grid; line-height: 1.1; }
+.kids-corner b { font-size: 1rem; } .kids-corner small { font-size: .74rem; opacity: .8; }
+@keyframes kc-bob { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-3px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .kids-corner .kc-icon { animation: none; } }
+@media (max-width: 899px) { .kids-corner { top: 64px; bottom: auto; left: auto; right: 12px; padding: 6px 12px 6px 8px; } .kids-corner .kc-icon { font-size: 1.25rem; } .kids-corner small { display: none; } }
+body.focusing .kids-corner { display: none; }

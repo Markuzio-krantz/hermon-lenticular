@@ -30,7 +30,8 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
   const canvas = document.createElement('canvas'); canvas.className = 'volume';
   container.prepend(canvas);
   const renderer = new THREE.WebGLRenderer({ canvas, depth: false, logarithmicDepthBuffer: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.25));
+  const DPR = { ultra: 1.75, high: 1.5, medium: 1.25, low: 1 };
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR[quality] ?? 1.25));
   renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 10;
   const camera = new THREE.PerspectiveCamera(40, 1, 10, 1e6);
   const scene = new THREE.Scene();
@@ -192,7 +193,7 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
   return {
     canvas, clouds, aerial,
     render(stageCamera) { if (!active) return; syncCamera(stageCamera); reanchor(); composer.render(); },
-    fromField, fromCM1, setSunLocal, setExag, setAmount, setQuality(q) { clouds.qualityPreset = q; },
+    fromField, fromCM1, setSunLocal, setExag, setAmount, setQuality(q) { clouds.qualityPreset = q; renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR[q] ?? 1.25)); resize(); },
     set active(v) { active = v; canvas.hidden = !v; }, get active() { return active; },
     resize,
   };

@@ -630,19 +630,20 @@ const QUALITY = {
   low: { dpr: 1.0, scale: 0.45, steps: 110, sharp: false, tag: 'LO' },
 };
 const INTER = { scale: 0.65, steps: 190, sharp: true };
-let qualityMode = 'auto', qualityLevel = mobile ? 'low' : 'medium';
+let qualityMode = 'auto', qualityLevel = mobile ? 'low' : 'high';
 try { qualityMode = localStorage.getItem('lenticular.quality') || 'auto'; } catch { /* private mode */ }
 function applyQuality(level) {
   qualityLevel = level; const q = QUALITY[level];
   Object.assign(INTER, { scale: q.scale, steps: q.steps, sharp: q.sharp });
   S.setDprCap(q.dpr); clouds.setScale(q.scale); clouds.uniforms.uSteps.value = q.steps;
+  vol?.setQuality(level);
   $('qualityTag').textContent = qualityMode === 'auto' ? `אוטו` : q.tag;
   for (const b of $('qualityMenu').querySelectorAll('button')) b.setAttribute('aria-checked', String(b.dataset.q === qualityMode));
   S.invalidate();
 }
 function setQualityMode(m) {
   qualityMode = m; try { localStorage.setItem('lenticular.quality', m); } catch { /* ignore */ }
-  applyQuality(m === 'auto' ? (mobile ? 'low' : 'medium') : m);
+  applyQuality(m === 'auto' ? (mobile ? 'low' : 'high') : m);
 }
 for (const b of $('qualityMenu').querySelectorAll('button')) b.addEventListener('click', () => { setQualityMode(b.dataset.q); $('qualityMenu').hidden = true; document.querySelector('[data-t=quality]').setAttribute('aria-expanded', 'false'); toast(`איכות: ${b.firstChild.textContent.trim()}`); });
 setQualityMode(qualityMode);
@@ -765,26 +766,29 @@ S.renderer.domElement.addEventListener('pointerdown', () => { menu(false); if (!
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null, false); } });
 
 // ---------- the volumetric main view (physical sky, volumetric clouds); the classic view stays as fallback
-let vol = null, volSlow = 0, volLast = 0;
-function volWatch(now) { // too slow for this device: back to the classic view, and say so
+var vol = null; let volSlow = 0, volLast = 0;  // var: the quality code above already asks for it
+function volWatch(now) { // too slow for this device: step the quality down first, and only then the classic view
   if (location.search.includes('volforce')) return;  // testing: keep the volumetric view whatever the speed
   const dt = volLast ? now - volLast : 16; volLast = now;
   volSlow = dt > 75 ? volSlow + dt : Math.max(0, volSlow - dt);
-  if (volSlow > 4000) { setVolume(false); toast('התצוגה הנפחית כבדה למכשיר הזה, עברנו לתצוגה הקלה · אפשר לחזור אליה בכלים'); }
+  if (volSlow < 3000) return;
+  volSlow = 0;
+  if (qualityMode === 'auto' && qualityLevel !== 'low') { autoDowngrade(); return; }
+  setVolume(false, false); toast('התצוגה הנפחית כבדה למכשיר הזה, עברנו לתצוגה הקלה · אפשר לחזור אליה בכלים');
 }
-function setVolume(on) {
+function setVolume(on, persist = true) {
   if (!vol) return;
   vol.active = on; S.setOverlay(on); clouds.enabled = !on && tw.cloud > 0.01; volSlow = 0; volLast = 0;
   $('volBtn')?.setAttribute('aria-pressed', String(on));
-  try { localStorage.setItem('lenticular.volume', on ? '1' : '0'); } catch { /* private mode */ }
+  if (persist) try { localStorage.setItem('lenticular.volume2', on ? '1' : '0'); } catch { /* private mode */ }  // only the visitor's own choice is remembered
   S.invalidate();
 }
 async function startVolume() {
-  let pref = null; try { pref = localStorage.getItem('lenticular.volume'); } catch { /* none */ }
+  let pref = null; try { pref = localStorage.getItem('lenticular.volume2'); } catch { /* none */ }
   if (mobile || pref === '0' || !document.createElement('canvas').getContext('webgl2')) return;
   try {
     const { createVolume } = await import('./volume.js');
-    vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel === 'high' ? 'high' : 'medium' });
+    vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel });
     vol.setExag(state.exag); if (field) vol.fromField(field);
     setSunNow(tw.sun); setVolume(true);
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
