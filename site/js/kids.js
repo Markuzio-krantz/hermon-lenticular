@@ -18,8 +18,9 @@ const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a
 // and thin at the ends: the lens shape. A dry gap between the two layers gives two plates.
 function rhAt(z0) {
   if (z0 >= 0.8 && z0 < 1.8) return P.low - 10 * ((z0 - 1.3) / 0.5) ** 2;
-  if (z0 >= 3.4 && z0 < 3.9) return P.up - 12 * ((z0 - 3.65) / 0.25) ** 2;
-  if (z0 >= 4.1 && z0 < 4.6) return P.up - 6 - 12 * ((z0 - 4.35) / 0.25) ** 2;
+  if (z0 >= 3.3 && z0 < 3.7) return P.up - 12 * ((z0 - 3.5) / 0.2) ** 2;
+  if (z0 >= 3.9 && z0 < 4.2) return P.up - 4 - 12 * ((z0 - 4.05) / 0.15) ** 2;
+  if (z0 >= 4.4 && z0 < 4.65) return P.up - 8 - 12 * ((z0 - 4.52) / 0.12) ** 2;
   return 25;
 }
 const needKm = (z0) => Math.max(0, 100 - rhAt(z0)) * 0.022;   // lift needed to reach the dew point
@@ -59,8 +60,8 @@ function build() {
       if (e <= need) continue;
       const z = z0 + e; if (z < ground(x) + 0.05 || z > ZT) continue;
       const d = Math.min(1, (e - need) / Math.max(0.12, need + 0.1));
-      cells.push({ x, z, d, kind: z0 < 2 ? 'cap' : 'lens', plate: z0 < 3.95 ? 'L' : 'U' });
-      if (z0 >= 3.4 && z0 < 4.6 && x > -6) lensX.push(x);
+      cells.push({ x, z, d, kind: z0 < 2 ? 'cap' : 'lens', plate: z0 < 3.8 ? 'L' : z0 < 4.3 ? 'M' : 'U' });
+      if (z0 >= 3.3 && z0 < 3.7 && x > -6) lensX.push(x);
     }
   }
   // heap clouds: warm bubbles rise from the ground when the air is not springy
@@ -99,12 +100,18 @@ function groups(list, gap) {
 }
 function makeObjects(rotor) {
   const T = [];
-  for (const plate of ['L', 'U']) {
+  for (const [plate, scale] of [['L', 1], ['M', 0.74], ['U', 0.5]]) {
     for (const g of groups(cells.filter((c) => c.kind === 'lens' && c.plate === plate), 0.8)) {
-      if (g.x1 - g.x0 < 0.3) continue;
+      if (g.x1 - g.x0 < 0.2) continue;
       const zs = g.cs.map((c) => c.z), zc = zs.reduce((a, b) => a + b, 0) / zs.length;
-      T.push({ id: `lens-${plate}-${Math.round((g.x0 + g.x1) / 4)}`, kind: 'lens', x0: g.x0 - 0.3, x1: g.x1 + 0.3, zc, th: Math.max(0.12, Math.max(...zs) - Math.min(...zs) + 0.1) });
+      T.push({ id: `lens-${plate}-${Math.round((g.x0 + g.x1) / 4)}`, kind: 'lens', x0: g.x0 - 0.3, x1: g.x1 + 0.3, zc, scale, th: Math.max(0.12, Math.max(...zs) - Math.min(...zs) + 0.1) });
     }
+  }
+  const lows = T.filter((o) => o.kind === 'lens' && o.id.startsWith('lens-L'));
+  for (const o of T) {
+    if (o.kind !== 'lens' || o.id.startsWith('lens-L')) continue;
+    const m = (o.x0 + o.x1) / 2, base = lows.find((l) => m > l.x0 - 2 && m < l.x1 + 2);
+    if (base) { const bm = (base.x0 + base.x1) / 2, w = (o.x1 - o.x0) / 2; o.x0 = bm - w; o.x1 = bm + w; o.zc = base.zc + (o.id.startsWith('lens-M') ? 0.3 : 0.55); }
   }
   for (const g of groups(cells.filter((c) => c.kind === 'cap'), 1.2)) {
     const puffs = []; const top = Math.max(...g.cs.map((c) => c.z));
@@ -194,14 +201,132 @@ function frame(t) {
     for (let i = 0; i <= 30; i++) { const x = -2.2 + (i / 30) * 4.4; const z = ground(x); i ? cx.lineTo(sx(x), sz(z)) : cx.moveTo(sx(x), sz(z)); }
     cx.lineTo(sx(2.2), sz(ground(2.2) - 0.25)); cx.lineTo(sx(-2.2), sz(ground(-2.2) - 0.25)); cx.fill();
   }
+  drawScales(); drawCues(t); drawFollow(t, dt);
   cx.fillStyle = 'rgba(255,255,255,.92)'; cx.font = `500 ${14 * dpr}px Rubik, sans-serif`; cx.textAlign = 'left';
   cx.fillText(P.wind < 1 ? 'אין רוח' : `רוח ← ${P.wind} מ'/ש`, 12 * dpr, Hpx - 14 * dpr);
 }
 
+// ---------------- follow one bubble of air: it cools as it rises, and at 100% it becomes droplets
+const follow = { on: false, x: X0 + 2, z0: 3.5, drops: [] };
+function rr(x, y, w, h, r) { cx.beginPath(); cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r); cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
+function drawFollow(t, dt) {
+  if (!follow.on) return;
+  follow.x += P.wind * 0.12 * dt * 3; if (follow.x > X1 - 2) follow.x = X0 + 2;
+  const e = eta(follow.x, follow.z0, W), z = follow.z0 + e, X = sx(follow.x), Y = sz(z);
+  const rh0 = rhAt(follow.z0), need = needKm(follow.z0), rh = Math.min(100, rh0 + (100 - rh0) * Math.max(0, e) / Math.max(0.01, need));
+  const wet = rh >= 100, temp = 2.4 - (wet ? 9.8 * need + 6 * (e - need) : 9.8 * e);
+  // the bubble
+  cx.save();
+  cx.fillStyle = wet ? 'rgba(255,255,255,.95)' : 'rgba(59,130,246,.9)'; cx.strokeStyle = '#ff7a59'; cx.lineWidth = 3 * dpr;
+  cx.beginPath(); cx.arc(X, Y, 9 * dpr, 0, Math.PI * 2); cx.fill(); cx.stroke();
+  if (wet) { if (Math.random() < 0.5) follow.drops.push({ x: X, y: Y, vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30, l: 0.8 }); }
+  follow.drops = follow.drops.filter((d) => (d.l -= dt) > 0);
+  for (const d of follow.drops) { d.x += d.vx * dt * dpr; d.y += d.vy * dt * dpr; cx.fillStyle = `rgba(80,150,255,${d.l})`; cx.beginPath(); cx.arc(d.x, d.y, 2.4 * dpr, 0, Math.PI * 2); cx.fill(); }
+  // the gauge card beside it
+  const w = 150 * dpr, h = 84 * dpr, gx = Math.min(Wpx - w - 8 * dpr, X + 16 * dpr), gy = Math.max(8 * dpr, Y - h - 14 * dpr);
+  cx.fillStyle = 'rgba(255,255,255,.94)'; rr(gx, gy, w, h, 12 * dpr); cx.fill();
+  cx.fillStyle = '#1f2340'; cx.font = `500 ${12 * dpr}px Rubik, sans-serif`; cx.textAlign = 'right'; cx.direction = 'rtl';
+  cx.fillText(`בועת אוויר · ${z.toFixed(1)} ק"מ`, gx + w - 10 * dpr, gy + 18 * dpr);
+  cx.fillText(`🌡️ ${temp.toFixed(1)}°`, gx + w - 10 * dpr, gy + 40 * dpr);
+  cx.fillText(wet ? '💧 טיפות! זה ענן' : `לחות ${Math.round(rh)}%`, gx + w - 10 * dpr, gy + 62 * dpr);
+  cx.fillStyle = '#e7e2d4'; rr(gx + 10 * dpr, gy + 68 * dpr, w - 20 * dpr, 8 * dpr, 4 * dpr); cx.fill();
+  cx.fillStyle = wet ? '#3b82f6' : '#7fb2ff'; rr(gx + 10 * dpr, gy + 68 * dpr, (w - 20 * dpr) * rh / 100, 8 * dpr, 4 * dpr); cx.fill();
+  cx.restore();
+}
+
+// ---------------- picture scales: a thermometer of height, droplets that show humidity
+const DROPS = Array.from({ length: 260 }, (_, i) => ({ x: X0 + ((i * 37.7) % 1) * 0 + ((i * 0.6180339) % 1) * (X1 - X0), z: (i * 0.7548776) % 1 }));
+function drawScales() {
+  // thermometer at the left edge: 15° at the ground, ~6.5° colder for every kilometre up
+  const x = 10 * dpr, w = 10 * dpr, top = sz(8.5), bot = sz(0.2);
+  const g = cx.createLinearGradient(0, bot, 0, top); g.addColorStop(0, '#ff6b4a'); g.addColorStop(0.45, '#ffd36b'); g.addColorStop(1, '#5aa0ff');
+  cx.fillStyle = 'rgba(255,255,255,.7)'; rr(x - 3 * dpr, top - 4 * dpr, w + 6 * dpr, bot - top + 8 * dpr, 8 * dpr); cx.fill();
+  cx.fillStyle = g; rr(x, top, w, bot - top, 5 * dpr); cx.fill();
+  cx.fillStyle = '#1f2340'; cx.font = `500 ${11 * dpr}px Rubik, sans-serif`; cx.textAlign = 'left'; cx.direction = 'ltr';
+  for (const z of [0, 2, 4, 6, 8]) cx.fillText(`${Math.round(15 - 6.5 * z)}°`, x + w + 5 * dpr, sz(z) + 4 * dpr);
+  cx.direction = 'rtl'; cx.textAlign = 'right';
+  // humidity you can see: droplets in the moist layers, more of them when it is wetter
+  const bands = [[0.8, 1.8, P.low], [3.3, 3.7, P.up], [3.9, 4.2, P.up - 4], [4.4, 4.65, P.up - 8]];
+  for (const [a, b, rh] of bands) {
+    const n = Math.max(0, Math.round((rh - 30) / 70 * 60));
+    cx.fillStyle = 'rgba(40,110,230,.55)';
+    for (let i = 0; i < n; i++) { const d = DROPS[(i * 7 + Math.round(a * 10)) % DROPS.length]; const z = a + d.z * (b - a);
+      if (z < ground(d.x) + 0.1) continue; cx.beginPath(); cx.arc(sx(d.x), sz(z), 1.6 * dpr, 0, Math.PI * 2); cx.fill(); }
+  }
+}
+
+// ---------------- the guided steps: how an ice-cream cloud is made
+const STEPS = [
+  { t: 'שלב 1: אוויר לח', x: 'הרוח מביאה אוויר מהים. בגובה 3–5 ק"מ יש שלוש שכבות לחות (הפסים הכחולים), אבל עוד אין ענן: האדים שקופים.', set: { wind: 10, hill: 2.2, spring: 1, up: 70, low: 40, jet: false }, cue: 'moist' },
+  { t: 'שלב 2: ההר דוחף למעלה', x: 'כשהאוויר פוגש את ההר, הוא חייב לעלות מעליו.', set: { up: 72 }, cue: 'lift' },
+  { t: 'שלב 3: קפיץ באוויר', x: 'האוויר קפיצי: אחרי שעלה הוא נופל חזרה, עובר את המקום שלו ועולה שוב. כך נוצר גל מאחורי ההר.', set: { up: 74 }, cue: 'wave' },
+  { t: 'שלב 4: למעלה קר', x: 'עקבו אחרי הבועה הכתומה: כשהיא עולה היא מתקררת, והלחות שלה עולה. ב־100% האדים הופכים לטיפות.', set: { up: 80 }, cue: 'follow' },
+  { t: 'שלב 5: הלוח הראשון', x: 'הלחות עולה. בפסגת הגל השכבה התחתונה מגיעה ל־100% ומופיע לוח דק של טיפות.', set: { up: 82 }, cue: 'grow1' },
+  { t: 'שלב 6: הענן מתעבה', x: 'עוד לחות, עוד טיפות: הלוח מתארך ומתעבה, ומעליו מתחילה קומה שנייה.', set: { up: 87 }, cue: 'grow2' },
+  { t: 'שלב 7: קומה שלישית', x: 'השכבה העליונה הכי יבשה, אז היא צריכה הכי הרבה הרמה. כשגם היא מתעבה, יש ענן גלידה בשלוש קומות!', set: { up: 93 }, cue: 'plates' },
+  { t: 'שלב 6: הענן נשאר', x: 'האוויר ממשיך לעבור דרך הענן: נהיה טיפות בכניסה ומתאדה ביציאה. לכן הענן נשאר במקום, גם כשנושבת רוח.', set: {}, cue: 'stays' },
+  { t: 'עכשיו תורכם!', x: 'שחקו עם המכונה ונסו לפתור את כל המשימות. מה קורה כשאין רוח? כשהאוויר לא קפיצי?', set: {}, cue: null },
+];
+let step = -1, tween = null;
+function setStep(i) {
+  step = i; const s = STEPS[i];
+  $('guide').hidden = false; $('gT').textContent = s.t; $('gX').textContent = s.x; $('gN').textContent = `${i + 1}/${STEPS.length}`;
+  $('gPrev').disabled = i === 0; $('gNext').textContent = i === STEPS.length - 1 ? 'סיום' : 'הבא ←';
+  follow.on = s.cue === 'follow' || s.cue === 'stays' || $('follow').checked; if (s.cue === 'follow') { follow.x = X0 + 6; }
+  if ('jet' in s.set) { P.jet = s.set.jet; $('jet').checked = P.jet; }
+  tween = { from: { ...P }, to: { ...P, ...s.set }, t0: performance.now() };
+}
+function endGuide() { step = -1; $('guide').hidden = true; follow.on = $('follow').checked; }
+function tweenFrame(now) {
+  if (!tween) return;
+  const k = Math.min(1, (now - tween.t0) / 1400), e = k * k * (3 - 2 * k);
+  for (const key of ['wind', 'hill', 'spring', 'up', 'low']) {
+    P[key] = tween.from[key] + (tween.to[key] - tween.from[key]) * e;
+    $(key).value = P[key]; $('o-' + key).textContent = FMT[key](key === 'hill' || key === 'spring' ? P[key] : Math.round(P[key]));
+  }
+  build(); if (k >= 1) tween = null;
+}
+function arrow(x0, y0, x1, y1, col) {
+  cx.strokeStyle = col; cx.fillStyle = col; cx.lineWidth = 4 * dpr; cx.lineCap = 'round';
+  cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x1, y1); cx.stroke();
+  const a = Math.atan2(y1 - y0, x1 - x0), L = 12 * dpr;
+  cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(x1 - L * Math.cos(a - 0.5), y1 - L * Math.sin(a - 0.5)); cx.lineTo(x1 - L * Math.cos(a + 0.5), y1 - L * Math.sin(a + 0.5)); cx.fill();
+}
+function label(txt, x, y) {
+  cx.font = `700 ${15 * dpr}px Rubik, sans-serif`; cx.direction = 'rtl'; cx.textAlign = 'center';
+  const w = cx.measureText(txt).width + 18 * dpr; cx.fillStyle = 'rgba(255,122,89,.95)'; rr(x - w / 2, y - 14 * dpr, w, 24 * dpr, 12 * dpr); cx.fill();
+  cx.fillStyle = '#fff'; cx.fillText(txt, x, y + 3 * dpr);
+}
+function drawCues(t) {
+  tweenFrame(performance.now());
+  const cue = step >= 0 ? STEPS[step].cue : glossCue; if (!cue) return;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 0.005);
+  cx.save();
+  if (cue === 'moist') {
+    cx.strokeStyle = `rgba(255,122,89,${0.5 + 0.4 * pulse})`; cx.lineWidth = 3 * dpr; cx.setLineDash([8 * dpr, 6 * dpr]);
+    for (const [a, b] of [[3.3, 3.7], [3.9, 4.2], [4.4, 4.65]]) { cx.strokeRect(4 * dpr, sz(b), Wpx - 8 * dpr, sz(a) - sz(b)); }
+    cx.setLineDash([]); label('שכבות לחות', sx(-12), sz(4.9));
+  }
+  if (cue === 'lift') { arrow(sx(-9), sz(1.0), sx(-2.5), sz(P.hill + 0.6 + 0.3 * pulse), '#ff7a59'); label('ההר דוחף למעלה', sx(-9), sz(P.hill + 1.4)); }
+  if (cue === 'wave') {
+    const z0 = 3.5, xs = [];
+    for (let x = 0.5; x < X1; x += 0.25) { const a = eta(x - 0.25, z0, W), b = eta(x, z0, W), c = eta(x + 0.25, z0, W); if (b > a && b >= c && b > 0.05) xs.push(x); if (xs.length > 2) break; }
+    for (const x of xs) { const y = sz(z0 + eta(x, z0, W)); cx.fillStyle = `rgba(255,122,89,${0.6 + 0.4 * pulse})`; cx.beginPath(); cx.arc(sx(x), y, (8 + 4 * pulse) * dpr, 0, Math.PI * 2); cx.fill(); }
+    if (xs[0] != null) { arrow(sx(xs[0] + W.lam * 0.25), sz(4.6), sx(xs[0] + W.lam * 0.45), sz(3.3), '#3b82f6'); label('למעלה, למטה, ושוב: גל', sx(xs[0] + 6), sz(6)); }
+  }
+  if (cue === 'grow1') label('קומה 1: לוח דק', sx(8), sz(5.6));
+  if (cue === 'grow2') label('קומה 2 מתחילה', sx(8), sz(5.9));
+  if (cue === 'plates') label('🍦 שלוש קומות: ענן גלידה', sx(8), sz(6.2));
+  if (cue === 'temp') label('למעלה קר יותר', sx(-20), sz(7));
+  if (cue === 'dew') label('100% = נקודת הטל → טיפות', sx(6), sz(6.4));
+  if (cue === 'stays') label('האוויר עובר → הענן נשאר', sx(10), sz(6.2));
+  cx.restore();
+}
+
 // ---------------- words, missions, stars
-const NAMES = { lens: '🛸 ענן עדשה', train: '🚂 רכבת עדשות', cap: '🎩 ענן כובע', heap: '🍦 ענני ערימה', rotor: '🌀 ענן רוטור', clear: '☀️ שמיים נקיים' };
+const NAMES = { lens: '🍦 ענן עדשה (ענן גלידה)', train: '🚂 רכבת עדשות', cap: '🎩 ענן כובע', heap: '🥦 ענני ערימה (כרובית)', rotor: '🌀 ענן רוטור', clear: '☀️ שמיים נקיים' };
 const MISSIONS = [
-  ['lens', 'צרו ענן עדשה מעל ההר'],
+  ['lens', 'צרו ענן גלידה: ענן עדשה מעל ההר'],
   ['cap', 'שימו לחות למטה וצרו ענן כובע על הפסגה'],
   ['train', 'צרו רכבת של 3 עדשות או יותר'],
   ['heap', 'הפכו את האוויר ללא קפיצי וצרו ענני ערימה'],
@@ -215,11 +340,11 @@ function drawMissions() {
 }
 function tipFor() {
   if (P.wind < 1) return 'בלי רוח האוויר לא עובר מעל ההר, ולכן אין גל ואין ענן. תנו קצת רוח!';
-  if (found.heap) return 'האוויר לא קפיצי, אז הוא לא חוזר למטה. במקום גל, בועות חמות עולות מהאדמה והופכות לענני ערימה, כמו גלידה.';
+  if (found.heap) return 'האוויר לא קפיצי, אז הוא לא חוזר למטה. במקום גל, בועות חמות עולות מהאדמה והופכות לענני ערימה, שנראים כמו כרובית.';
   if (P.spring < 0.35) return 'האוויר כמעט לא קפיצי. כשהוא לא חוזר למטה, אין גל מאחורי ההר.';
   if (found.train) return `כשהרוח גבוה בשמיים חזקה, הגל נלכד וקופץ שוב ושוב: ${found.lenses} עדשות בשורה!`;
   if (found.rotor) return 'מתחת לגל האוויר מסתובב כמו גלגל. זה ענן רוטור, וטייסים נזהרים ממנו.';
-  if (found.lens) return 'ענן עדשה! הגל הרים את השכבה הלחה עד שהתקררה והפכה לטיפות. האוויר ממשיך לזרום דרכו, והענן נשאר במקום.';
+  if (found.lens) return 'ענן גלידה! הגל הרים את השכבות הלחות עד שהתקררו והפכו לטיפות. כל שכבה היא קומה, והעליונות קטנות יותר כי הן יבשות יותר. האוויר עובר, הענן נשאר.';
   if (found.cap) return 'ענן כובע! האוויר הלח שלמטה מטפס על ההר, מתקרר ונהיה ענן שיושב על הפסגה.';
   if (P.up < 60) return 'השכבה למעלה יבשה מדי. תוסיפו לחות למעלה, והגל יוכל להפוך אותה לענן.';
   if (P.spring > 1.6 && P.wind < 6) return 'רוח חלשה ואוויר קפיצי מאוד: האוויר עוקף את ההר במקום לעלות עליו.';
@@ -252,6 +377,29 @@ for (const k of Object.keys(FMT)) {
   el.addEventListener('input', () => { P[k] = +el.value; $('o-' + k).textContent = FMT[k](P[k]); build(); });
 }
 $('jet').addEventListener('change', () => { P.jet = $('jet').checked; build(); });
+$('follow').addEventListener('change', () => { follow.on = $('follow').checked; follow.x = X0 + 4; });
+$('guideBtn').addEventListener('click', () => setStep(0));
+// picture glossary: each word has a short explanation and lights up its part of the drawing
+const WORDS = {
+  hum: ['לחות', 'כמה אדי מים יש באוויר. האדים שקופים, לא רואים אותם. 100% זה הכי הרבה שהאוויר יכול להחזיק.', 'moist'],
+  temp: ['טמפרטורה', 'כמה חם או קר. ככל שעולים גבוה יותר בשמיים, קר יותר: בערך 6.5° פחות כל קילומטר.', 'temp'],
+  dew: ['נקודת הטל', 'הטמפרטורה שבה הלחות מגיעה ל־100%. מתחתיה האדים הופכים לטיפות, כמו על כוס קרה.', 'dew'],
+  spring: ['אוויר קפיצי', 'אוויר שחוזר למקום אחרי שהרימו אותו, כמו קפיץ. בלי זה אין גל.', 'wave'],
+  wave: ['גל', 'האוויר עולה ויורד שוב ושוב מאחורי ההר. בפסגות הגל האוויר הכי גבוה והכי קר.', 'wave'],
+  cond: ['התעבות', 'כשאדי מים מתקררים הם הופכים לטיפות זעירות. מיליוני טיפות ביחד הן ענן.', 'dew'],
+  wind: ['רוח', 'אוויר שזז. הרוח מביאה את האוויר הלח אל ההר. בלי רוח, אין גל.', 'lift'],
+};
+let glossCue = null, glossT = 0;
+for (const b of document.querySelectorAll('[data-w]')) b.addEventListener('click', () => {
+  const [t, x, cue] = WORDS[b.dataset.w]; $('wordT').textContent = t; $('wordX').textContent = x; $('wordBox').hidden = false;
+  document.querySelectorAll('[data-w]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  glossCue = cue; if (cue === 'dew') { follow.on = true; follow.x = X0 + 6; }
+  clearTimeout(glossT); glossT = setTimeout(() => { glossCue = null; if (step < 0) follow.on = $('follow').checked; }, 9000);
+  $('sky').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+$('gNext').addEventListener('click', () => (step >= STEPS.length - 1 ? endGuide() : setStep(step + 1)));
+$('gPrev').addEventListener('click', () => step > 0 && setStep(step - 1));
+$('gClose').addEventListener('click', endGuide);
 $('reset').addEventListener('click', () => { done = {}; localStorage.removeItem('kids.done'); build(); });
 addEventListener('resize', resize);
 resize(); build(); requestAnimationFrame(frame);

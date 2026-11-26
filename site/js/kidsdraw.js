@@ -45,9 +45,9 @@ export function createScene() {
 export function drawLens(cx, o, sx, sz, t, dpr) {
   const c = o.c, s = c.s; if (s < 0.01) return;
   // a lens is long and flat: at least four times wider than thick (drawn a little larger than life)
-  const xm = (c.x0 + c.x1) / 2, half = Math.max(1.6, (c.x1 - c.x0) / 2 + 0.6) * (0.35 + 0.65 * s);
+  const xm = (c.x0 + c.x1) / 2, half = Math.max(3.4, (c.x1 - c.x0) / 2 + 1.2) * (c.scale ?? 1) * (0.35 + 0.65 * s);
   const a = sx(xm - half), b = sx(xm + half), y = sz(c.zc);
-  const th = Math.min((b - a) / 4.5, Math.max(7 * dpr, (sz(c.zc - c.th) - y) * 1.2)) * (0.4 + 0.6 * s);
+  const th = Math.min((b - a) / 4, Math.max(14 * dpr, (sz(c.zc - c.th) - y) * 1.4)) * (0.4 + 0.6 * s);
   const top = y - th * 0.7, bot = y + th * 0.3, wob = Math.sin(t * 0.0012 + c.x0) * 1.5 * dpr;
   cx.save();
   cx.globalAlpha = 0.18 * s; cx.fillStyle = '#4a5a8a';

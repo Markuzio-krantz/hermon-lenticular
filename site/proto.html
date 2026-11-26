@@ -65,11 +65,19 @@
     <button class="chip" type="button" data-v="near">ליד העדשה</button>
     <button class="chip" type="button" data-v="above">מעל</button>
   </div>
+  <div class="row" role="group" aria-label="מקור העננים"><button class="chip" type="button" data-src="linear" aria-pressed="true">מודל לינארי</button><button class="chip" type="button" data-src="cm1" aria-pressed="false">סימולציה CM1</button></div>
+  <div id="cm1Box" hidden>
+    <p>סימולציה תלת־ממדית מלאה של אותו ערב (CM1): שעתיים של זרימה מעל השטח האמיתי. הענן כאן לא מצויר מנוסחה, הוא מה שהמודל יצר.</p>
+    <button class="chip primary" id="simPlay" type="button">▶ הפעלת השעתיים</button>
+    <label>זמן בסימולציה <output id="o-simT">120 דק'</output><input id="simT" type="range" min="0" max="120" step="1" value="120"></label>
+  </div>
+  <div id="linBox">
   <button class="chip primary" id="play" type="button">הפעלת ההיווצרות</button>
   <label>רוח <output id="o-windScale"></output><input id="p-windScale" type="range" min="0.4" max="1.8" step="0.05"></label>
   <label>יציבות <output id="o-stabilityScale"></output><input id="p-stabilityScale" type="range" min="0.3" max="1.8" step="0.05"></label>
   <label>לחות בשכבת העדשה <output id="o-lensBoost"></output><input id="p-lensBoost" type="range" min="0" max="25" step="1"></label>
   <p class="stats" id="stats" aria-live="polite"></p>
+  </div>
   <div class="row"><button class="chip" id="reset" type="button">חזרה לערב 19.11</button><label class="chk"><input type="checkbox" id="tags" checked> שמות השכבות</label></div>
   <label>שעה (שעון ישראל) <output id="o-time"></output><input id="time" type="range" min="900" max="1050" step="1" value="995"></label>
   <label>כמה מהעדשה נראה <output id="o-cov"></output><input id="cov" type="range" min="0.2" max="0.95" step="0.01" value="0.62"></label>

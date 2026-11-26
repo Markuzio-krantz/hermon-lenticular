@@ -137,6 +137,15 @@ function buildWeather(r) {
     const a = fi - i, c = fj - j, A = B[b];
     return (A[j * nx + i] * (1 - a) + A[j * nx + i + 1] * a) * (1 - c) + (A[(j + 1) * nx + i] * (1 - a) + A[(j + 1) * nx + i + 1] * a) * c;
   };
+  writeWeather((b, x, n) => Math.sqrt(at(b, x, n) / Math.max(1e-6, mx[b])));
+  // where is the main lens? the column with the most lower-plate condensate (5x5 neighbourhood)
+  let best = 0, bi = nx / 2, bj = ny / 2;
+  for (let j = 2; j < ny - 2; j++) for (let i = 2; i < nx - 2; i++) { let m = 0; for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) m += B[0][(j + b) * nx + i + a]; if (m > best) { best = m; bi = i; bj = j; } }
+  const xk = (bi + 0.5) / nx * 64 - 32, nk = 32 - (bj + 0.5) / ny * 64;
+  return { lat: CLAT + nk / 111.2, lon: CLON + xk / (111.2 * Math.cos(CLAT * Math.PI / 180)) };
+}
+// weather texture from any sampler f(band, x east km, n north km) -> 0..1, placed on Takram's cube-sphere UV
+function writeWeather(f) {
   // local linearisation of the cube-sphere UV around the centre, at lens height
   const p0 = center.clone().addScaledVector(U, 4000), uv0 = cubeUv(p0);
   const ue = cubeUv(p0.clone().addScaledVector(E, 1000)), un = cubeUv(p0.clone().addScaledVector(N, 1000));
@@ -147,7 +156,7 @@ function buildWeather(r) {
   for (let t = 0; t < S; t++) for (let s = 0; s < S; s++) {
     const du = ((s + 0.5) / S - 0.5) / R, dv = ((t + 0.5) / S - 0.5) / R;
     const x = Ji[0][0] * du + Ji[0][1] * dv, n = Ji[1][0] * du + Ji[1][1] * dv, o = (t * S + s) * 4;
-    for (let b = 0; b < 3; b++) data[o + b] = Math.round(255 * Math.min(1, Math.sqrt(at(b, x, n) / Math.max(1e-6, mx[b]))));
+    for (let b = 0; b < 3; b++) data[o + b] = Math.round(255 * Math.min(1, f(b, x, n)));
   }
   const tex = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.minFilter = THREE.LinearMipMapLinearFilter; tex.magFilter = THREE.LinearFilter;
@@ -157,11 +166,6 @@ function buildWeather(r) {
   weatherAnchor = { p0, R };
   clouds.localWeatherOffset.set(0.5 - uv0[0] * R, 0.5 - uv0[1] * R);
   clouds.localWeatherVelocity.set(0, 0);
-  // where is the main lens? the column with the most lower-plate condensate (5x5 neighbourhood)
-  let best = 0, bi = nx / 2, bj = ny / 2;
-  for (let j = 2; j < ny - 2; j++) for (let i = 2; i < nx - 2; i++) { let m = 0; for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) m += B[0][(j + b) * nx + i + a]; if (m > best) { best = m; bi = i; bj = j; } }
-  const xk = (bi + 0.5) / nx * 64 - 32, nk = 32 - (bj + 0.5) / ny * 64;
-  return { lat: CLAT + nk / 111.2, lon: CLON + xk / (111.2 * Math.cos(CLAT * Math.PI / 180)) };
 }
 status('מחשב את גל ההר…');
 await new Promise((r) => setTimeout(r, 30));
@@ -174,13 +178,13 @@ status('');
 
 // ---------- views, time, controls
 const L = (dlat, dlon, h) => [lens.lat + dlat, lens.lon + dlon, h];
-const VIEWS = {
+const VIEWS = () => ({
   hula: { from: [33.10, 35.585, 450], to: L(0, 0, 3800) },          // the photographers' view, from the valley
   near: { from: L(-0.045, -0.06, 3300), to: L(0, 0, 3900) },        // 7 km away, just under the plates
   above: { from: L(-0.22, -0.05, 9000), to: L(0, 0, 3600) },
-};
+});
 function setView(k) {
-  const v = VIEWS[k]; camera.position.copy(ecef(...v.from)); controls.target.copy(ecef(...v.to));
+  const v = VIEWS()[k]; camera.position.copy(ecef(...v.from)); controls.target.copy(ecef(...v.to));
   camera.up.copy(Ellipsoid.WGS84.getSurfaceNormal(camera.position)); controls.update();
   document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === k)));
 }
@@ -211,11 +215,16 @@ const labels = new CSS2DRenderer(); labels.setSize(innerWidth, innerHeight);
 Object.assign(labels.domElement.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: 3, direction: 'ltr' });
 document.body.appendChild(labels.domElement);
 const tags = [];
+let source = 'linear';   // 'linear' (the site's model) or 'cm1' (the 3-D simulation)
 function rhAt(prof, z) { return prof.RH[Math.min(prof.nz - 1, Math.round(z / prof.dz))]; }
 function placeTags() {
   for (const t of tags) t.removeFromParent(); tags.length = 0;
   const prof = last.prof;
-  const LAY = [
+  const LAY = source === 'cm1' ? [
+    { z: 4800, t: 'לוח עליון (CM1)', d: '⁦4.5–5.15⁩ ק"מ · ענן שהסימולציה יצרה', c: '#f0a043' },
+    { z: 4250, t: 'לוח תחתון (CM1)', d: '⁦4.0–4.5⁩ ק"מ · ענן שהסימולציה יצרה', c: '#48c79a' },
+    { z: 2200, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
+  ] : [
     { z: 4450, t: 'שכבה לחה עליונה', d: `⁦4.05–4.8⁩ ק"מ · ${Math.round(rhAt(prof, 4350))}% לחות → הלוח העליון`, c: '#f0a043' },
     { z: 4050, t: 'שכבה יבשה ביניהן', d: `${Math.round(rhAt(prof, 4050))}% לחות → רווח שקוף בין הלוחות`, c: '#c9b38a' },
     { z: 3750, t: 'שכבה לחה תחתונה', d: `⁦3.5–4.05⁩ ק"מ · ${Math.round(rhAt(prof, 3800))}% לחות → הלוח התחתון`, c: '#48c79a' },
@@ -230,6 +239,77 @@ function placeTags() {
   $('layersList').innerHTML = LAY.map((L, i) => `<li><i style="background:${L.c}">${i + 1}</i><b>${L.t}</b><span>${L.d}</span></li>`).join('');
 }
 placeTags();
+
+// ---------- second source: the CM1 3-D simulation of the same evening (non-linear, terrain-following)
+// The linear model stays the default; CM1 is an extra view, played through its two simulated hours.
+let cm1 = null, cm1T = 0, cm1Play = null;
+const LINEAR_LAYERS = Array.from(clouds.cloudLayers, (l) => ({ altitude: l.altitude, height: l.height, densityScale: l.densityScale }));
+async function loadCM1() {
+  if (cm1) return cm1;
+  const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_weather.bin').then((r) => r.arrayBuffer())]);
+  cm1 = { meta, data: new Uint8Array(buf) };
+  return cm1;
+}
+function cm1Sampler(tMin) {
+  const { meta, data } = cm1, nx = meta.nx, ny = meta.ny, dk = meta.dx_km, nb = meta.bands_km.length;
+  const times = meta.times_s.map((s) => s / 60), last = times.length - 1;
+  let f = 0; while (f < last && times[f + 1] <= tMin) f++;
+  const g = f < last ? Math.min(1, (tMin - times[f]) / (times[f + 1] - times[f])) : 0, f1 = Math.min(last, f + 1);
+  const sx = (meta.summit.lon - CLON) * 111.2 * Math.cos(CLAT * Math.PI / 180), sn = (meta.summit.lat - CLAT) * 111.2;
+  const a = meta.wind_toward_deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const px = (fr, b, i, j) => data[((fr * nb + b) * ny + j) * nx + i] / 255;
+  return (b, x, n) => {
+    if (b > 1) return 0;                                  // CM1 gives the two plates; no cap layer here
+    const dx = x - sx, dn = n - sn, s = dx * ca + dn * sa, c = -dx * sa + dn * ca;
+    const fi = (s - meta.s0_km) / dk, fj = (c - meta.c0_km) / dk, i = Math.floor(fi), j = Math.floor(fj);
+    if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return 0;
+    const u = fi - i, v = fj - j;
+    const bil = (fr) => (px(fr, b, i, j) * (1 - u) + px(fr, b, i + 1, j) * u) * (1 - v) + (px(fr, b, i, j + 1) * (1 - u) + px(fr, b, i + 1, j + 1) * u) * v;
+    return bil(f) * (1 - g) + bil(f1) * g;
+  };
+}
+function cm1Lens() { // the strongest lower-plate column at the last time, as lat/lon
+  const { meta, data } = cm1, nx = meta.nx, ny = meta.ny, nb = meta.bands_km.length, fr = meta.times_s.length - 1;
+  let best = -1, bi = 0, bj = 0;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const v = data[((fr * nb) * ny + j) * nx + i]; if (v > best) { best = v; bi = i; bj = j; } }
+  const s = meta.s0_km + bi * meta.dx_km, c = meta.c0_km + bj * meta.dx_km, a = meta.wind_toward_deg * Math.PI / 180;
+  const dlat = (Math.sin(a) * s + Math.cos(a) * c) / 111.2, dlon = (Math.cos(a) * s - Math.sin(a) * c) / (111.2 * Math.cos(CLAT * Math.PI / 180));
+  return { lat: meta.summit.lat + dlat, lon: meta.summit.lon + dlon };
+}
+function showCM1(tMin) {
+  cm1T = tMin; writeWeather(cm1Sampler(tMin));
+  $('o-simT').textContent = `${Math.round(tMin)} דק'`; $('simT').value = tMin;
+}
+async function setSource(src) {
+  source = src;
+  document.querySelectorAll('[data-src]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.src === src)));
+  $('cm1Box').hidden = src !== 'cm1'; $('linBox').hidden = src === 'cm1';
+  if (src === 'cm1') {
+    status('טוען את הסימולציה…'); await loadCM1(); status('');
+    const [lo, hi] = cm1.meta.bands_km;
+    clouds.cloudLayers.set([
+      { channel: 'r', altitude: lo[0] * 1000, height: (lo[1] - lo[0]) * 1000, densityScale: 0.34, shapeAmount: 0.12, shapeDetailAmount: 0.22, shapeAlteringBias: 0.5, coverageFilterWidth: 0.3, shadow: true },
+      { channel: 'g', altitude: hi[0] * 1000, height: (hi[1] - hi[0]) * 1000, densityScale: 0.3, shapeAmount: 0.12, shapeDetailAmount: 0.22, shapeAlteringBias: 0.5, coverageFilterWidth: 0.3, shadow: true },
+      { channel: 'b', altitude: 0, height: 0, densityScale: 0 }, { channel: 'a', altitude: 0, height: 0, densityScale: 0 },
+    ]);
+    lens = cm1Lens(); showCM1(+$('simT').value); placeTags();
+  } else {
+    if (cm1Play) { cancelAnimationFrame(cm1Play); cm1Play = null; $('simPlay').textContent = '▶ הפעלת השעתיים'; }
+    LINEAR_LAYERS.forEach((l, i) => Object.assign(clouds.cloudLayers[i], l));
+    lens = buildWeather(last); placeTags();
+  }
+}
+document.querySelectorAll('[data-src]').forEach((b) => b.addEventListener('click', () => setSource(b.dataset.src)));
+let simQueued = false;
+$('simT').addEventListener('input', () => { if (simQueued) return; simQueued = true; requestAnimationFrame(() => { simQueued = false; showCM1(+$('simT').value); }); });
+$('simPlay').addEventListener('click', () => {
+  if (cm1Play) { cancelAnimationFrame(cm1Play); cm1Play = null; $('simPlay').textContent = '▶ הפעלת השעתיים'; return; }
+  let t = cm1T >= 119 ? 0 : cm1T, lastT = performance.now();
+  $('simPlay').textContent = '⏸ עצירה';
+  const step = (now) => { t = Math.min(120, t + (now - lastT) / 1000 * 6); lastT = now; showCM1(t); // 20 s for two hours
+    if (t < 120) cm1Play = requestAnimationFrame(step); else { cm1Play = null; $('simPlay').textContent = '▶ הפעלת השעתיים'; } };
+  cm1Play = requestAnimationFrame(step);
+});
 $('tags').addEventListener('change', () => { labels.domElement.hidden = !$('tags').checked; $('layersCard').hidden = !$('tags').checked; });
 if (innerWidth < 760) $('layersCard').open = false;
 
