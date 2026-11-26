@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600&display=swap">
 <link rel="stylesheet" href="site.css">
-<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" crossorigin>
+<link rel="modulepreload" href="https://esm.sh/three@0.172.0" crossorigin>
 </head>
 <body>
 <div class="stage" id="stage" role="img" aria-label="מפה תלת-ממדית של עמק החולה, רמת הגולן והחרמון. גרירה מסובבת, צביטה או גלגלת מקרבות."></div>
@@ -63,6 +63,8 @@
   <button type="button" data-t="views" class="views-btn" aria-expanded="false" aria-controls="views" aria-label="נקודות מבט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
   <button type="button" data-t="focus" class="focus-btn" aria-pressed="false" aria-label="הסתרת הכפתורים: רק המפה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.1 3.8M6.2 7.6C3.6 9.4 2 12 2 12s3.6 6 10 6c1.4 0 2.7-.3 3.8-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><span>רק מפה</span></button>
   <button type="button" data-t="quality" class="quality-btn" aria-expanded="false" aria-controls="qualityMenu" aria-label="איכות התצוגה"><b id="qualityTag">אוטו</b><span>איכות</span></button>
+  <button type="button" id="volBtn" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 1 1 17 17Z"/></svg><span>תלת־ממד מלא</span></button>
+  <button type="button" id="cm1Btn" aria-pressed="false"><b>CM1</b><span>ענן מסימולציה</span></button>
   <button type="button" data-t="share" aria-label="העתקת קישור למה שמוצג עכשיו"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>קישור</span></button>
 </div></div>
   </div>
@@ -283,8 +285,21 @@
 
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  "three": "https://esm.sh/three@0.172.0",
+  "three/addons/": "https://esm.sh/three@0.172.0/examples/jsm/",
+  "three/examples/": "https://esm.sh/three@0.172.0/examples/",
+  "postprocessing": "https://esm.sh/*postprocessing@6.37.6",
+  "@takram/three-geospatial": "https://esm.sh/*@takram/three-geospatial@0.9.1",
+  "@takram/three-geospatial/": "https://esm.sh/*@takram/three-geospatial@0.9.1/",
+  "@takram/three-atmosphere": "https://esm.sh/*@takram/three-atmosphere@0.19.1",
+  "@takram/three-atmosphere/": "https://esm.sh/*@takram/three-atmosphere@0.19.1/",
+  "@takram/three-clouds": "https://esm.sh/*@takram/three-clouds@0.7.6",
+  "@takram/three-clouds/": "https://esm.sh/*@takram/three-clouds@0.7.6/",
+  "tiny-invariant": "https://esm.sh/tiny-invariant@1.3.3",
+  "@petamoriken/float16": "https://esm.sh/@petamoriken/float16@3.9.3",
+  "astronomy-engine": "https://esm.sh/astronomy-engine@2.1.19",
+  "url-join": "https://esm.sh/url-join@5.0.0",
+  "react-merge-refs": "https://esm.sh/react-merge-refs@3.0.2"
 } }
 </script>
 <script type="module" src="js/site.js"></script>

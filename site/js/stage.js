@@ -19,7 +19,7 @@ export function sunState(elevDeg) {
 }
 
 export function createStage(container, { heights, res, places, satURL, satLowURL, coreURL, landURL, normalURL, mobile }) {
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance' });
   let maxDpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 1.75);
   let dpr = Math.min(maxDpr, mobile ? 1.25 : 1.5);
   renderer.setPixelRatio(dpr);
@@ -178,6 +178,14 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
 
   // ---------- sun
   let sunElev = 1; const sunAz = 246;
+  // overlay mode: the volumetric view draws sky, terrain and clouds underneath; this stage keeps only
+  // the explanation layers, with its terrain written to depth so mountains still hide what is behind
+  let overlay = false, fogSaved = null;
+  function setOverlay(on) {
+    overlay = on; sky.visible = !on; apron.visible = !on; skirt.visible = !on;
+    terrain.material.colorWrite = !on; terrain.material.needsUpdate = true;
+    renderer.setClearColor(0x000000, on ? 0 : 1); scene.fog = on ? null : fogSaved; invalidate();
+  }
   function setSun(elevDeg) {
     sunElev = elevDeg;
     const st = sunState(elevDeg), phi = THREE.MathUtils.degToRad(90 - elevDeg), th = THREE.MathUtils.degToRad(sunAz);
@@ -189,7 +197,7 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
     hemi.intensity = 0.75 + 0.6 * tw;
     hemi.color.setHSL(0.63, 0.55, 0.55 + 0.2 * tw);
     const fogC = new THREE.Color().setHSL(0.66 - 0.06 * (1 - tw), 0.28, 0.16 + 0.34 * tw);
-    scene.fog = new THREE.FogExp2(fogC, mobile ? 0.0058 : 0.0048);
+    fogSaved = new THREE.FogExp2(fogC, mobile ? 0.0058 : 0.0048); if (!overlay) scene.fog = fogSaved;
     apron.material.color.copy(fogC).multiplyScalar(0.42);
     coreU.uCity.value = THREE.MathUtils.clamp((1.5 - elevDeg) / 3, 0, 1);
     coreU.uWaterSky.value.setHSL(0.62 - 0.08 * (1 - tw), 0.4, 0.22 + 0.4 * tw);
@@ -270,6 +278,7 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
   return {
     renderer, labelRenderer, scene, camera, controls, terrain, column, slice, rotors, labels, boxLine,
     get exag() { return exag; }, get flying() { return !!fly; }, get dirty() { return dirty; }, set dirty(v) { dirty = v; },
+    setOverlay, get overlay() { return overlay; },
     invalidate, adapt, setDprCap, sharp, get isSharp() { return hi; }, setFrameOffset, setExaggeration, setSun, setColumn, setSlice, setRotors, goTo, goToPose, updateFly, pickGround, pickRay, zoom, groundAt: hAt,
   };
 }

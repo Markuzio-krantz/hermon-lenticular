@@ -17,7 +17,7 @@ const CLAT = 33.25, CLON = 35.72, HALF_KM = 64;
 const ecef = (lat, lon, h) => new Geodetic(radians(lon), radians(lat), h).toECEF();
 
 // ---------- renderer, camera, post-processing (after Takram's vanilla story)
-const renderer = new THREE.WebGLRenderer({ depth: false, logarithmicDepthBuffer: false, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ depth: true, logarithmicDepthBuffer: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 10;
@@ -26,6 +26,7 @@ const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 10, 1e6
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.minDistance = 200;
 const scene = new THREE.Scene();
+const overlay = new THREE.Scene();   // the air layers: translucent sheets drawn over the finished image
 
 const center = ecef(CLAT, CLON, 0);
 const E = new THREE.Vector3(), N = new THREE.Vector3(), U = new THREE.Vector3();
@@ -102,6 +103,9 @@ const wide = await loadHeights('data/wide_height_1024.png', 1024);
   const ground = new THREE.Mesh(geo, mat);
   const g = new THREE.Group(); Ellipsoid.WGS84.getEastNorthUpFrame(center).decompose(g.position, g.quaternion, g.scale);
   g.add(ground); scene.add(g);
+  // the same ground, depth only, so the layer sheets drawn after the volumetric passes hide behind mountains
+  const gd = new THREE.Group(); gd.position.copy(g.position); gd.quaternion.copy(g.quaternion);
+  gd.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ colorWrite: false }))); overlay.add(gd);
 }
 
 // ---------- physics → local weather texture on Takram's cube-sphere UV
@@ -207,7 +211,9 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 
 let fpsT = performance.now(), fpsN = 0;
 renderer.setAnimationLoop(() => {
-  controls.update(); formationFrame(performance.now()); anchorWeather(); composer.render(); labels.render(scene, camera);
+  controls.update(); formationFrame(performance.now()); anchorWeather(); composer.render();
+  if (sheets.visible) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true; }
+  labels.render(scene, camera);
   fpsN++; const now = performance.now(); if (now - fpsT > 1000) { $('fps').textContent = `${(fpsN * 1000 / (now - fpsT)).toFixed(0)} fps`; fpsN = 0; fpsT = now; }
 });
 // ---------- the air layers, named where they are: what each one is, its height, its humidity
@@ -215,26 +221,41 @@ const labels = new CSS2DRenderer(); labels.setSize(innerWidth, innerHeight);
 Object.assign(labels.domElement.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: 3, direction: 'ltr' });
 document.body.appendChild(labels.domElement);
 const tags = [];
+const sheets = new THREE.Group(); overlay.add(sheets);
+const SHEET_KM = 44;
 let source = 'linear';   // 'linear' (the site's model) or 'cm1' (the 3-D simulation)
 function rhAt(prof, z) { return prof.RH[Math.min(prof.nz - 1, Math.round(z / prof.dz))]; }
 function placeTags() {
   for (const t of tags) t.removeFromParent(); tags.length = 0;
+  for (const c of [...sheets.children]) { c.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); }); sheets.remove(c); }
   const prof = last.prof;
   const LAY = source === 'cm1' ? [
-    { z: 4800, t: 'לוח עליון (CM1)', d: '⁦4.5–5.15⁩ ק"מ · ענן שהסימולציה יצרה', c: '#f0a043' },
-    { z: 4250, t: 'לוח תחתון (CM1)', d: '⁦4.0–4.5⁩ ק"מ · ענן שהסימולציה יצרה', c: '#48c79a' },
-    { z: 2200, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
+    { z: 4800, z0: 4500, z1: 5150, t: 'לוח עליון (CM1)', d: '⁦4.5–5.15⁩ ק"מ · ענן שהסימולציה יצרה', c: '#f0a043' },
+    { z: 4250, z0: 4000, z1: 4500, t: 'לוח תחתון (CM1)', d: '⁦4.0–4.5⁩ ק"מ · ענן שהסימולציה יצרה', c: '#48c79a' },
+    { z: 2200, z0: 1800, z1: 2600, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
   ] : [
-    { z: 4450, t: 'שכבה לחה עליונה', d: `⁦4.05–4.8⁩ ק"מ · ${Math.round(rhAt(prof, 4350))}% לחות → הלוח העליון`, c: '#f0a043' },
-    { z: 4050, t: 'שכבה יבשה ביניהן', d: `${Math.round(rhAt(prof, 4050))}% לחות → רווח שקוף בין הלוחות`, c: '#c9b38a' },
-    { z: 3750, t: 'שכבה לחה תחתונה', d: `⁦3.5–4.05⁩ ק"מ · ${Math.round(rhAt(prof, 3800))}% לחות → הלוח התחתון`, c: '#48c79a' },
-    { z: 2200, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
+    { z: 4450, z0: 4050, z1: 4800, t: 'שכבה לחה עליונה', d: `⁦4.05–4.8⁩ ק"מ · ${Math.round(rhAt(prof, 4350))}% לחות → הלוח העליון`, c: '#f0a043' },
+    { z: 4050, z0: 3950, z1: 4050, dry: true, t: 'שכבה יבשה ביניהן', d: `${Math.round(rhAt(prof, 4050))}% לחות → רווח שקוף בין הלוחות`, c: '#c9b38a' },
+    { z: 3750, z0: 3500, z1: 3950, t: 'שכבה לחה תחתונה', d: `⁦3.5–4.05⁩ ק"מ · ${Math.round(rhAt(prof, 3800))}% לחות → הלוח התחתון`, c: '#48c79a' },
+    { z: 2200, z0: 1800, z1: 2600, t: 'אינוורסיה', d: '⁦1.8–2.6⁩ ק"מ · האוויר יציב מאוד: הקפיץ שיוצר את הגל', c: '#3fb0e0' },
   ];
-  // the explanation lives in a side card (collapsible); in the scene only small numbered markers sit at
-  // each layer's height beside the lens, so the lens itself stays clear in the middle
+  // each layer is drawn for real: a translucent slab of its true depth around the lens (east-north-up frame),
+  // with a bright rim; the numbers sit side by side inside the slabs, west of the lens
+  const at = ecef(lens.lat, lens.lon, 0), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+  Ellipsoid.WGS84.getEastNorthUpFrame(at).decompose(pos, q, sc);
+  const W = SHEET_KM * 1000;
   LAY.forEach((L, i) => {
+    const h = Math.max(60, L.z1 - L.z0), col = new THREE.Color(L.c);
+    const box = new THREE.BoxGeometry(W, W, h);
+    const slab = new THREE.Mesh(box, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: L.dry ? 0.03 : 0.07, depthWrite: false, side: THREE.DoubleSide }));
+    const rim = new THREE.LineSegments(new THREE.EdgesGeometry(box), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: L.dry ? 0.35 : 0.8 }));
+    const g = new THREE.Group(); g.position.copy(pos); g.quaternion.copy(q); g.translateZ((L.z0 + L.z1) / 2);
+    g.add(slab, rim); g.renderOrder = 10 - i; sheets.add(g);
     const m = document.createElement('div'); m.className = 'mark'; m.style.background = L.c; m.textContent = String(i + 1);
-    m.title = L.t; const o = new CSS2DObject(m); o.position.copy(ecef(lens.lat, lens.lon - 0.028, L.z)); scene.add(o); tags.push(o);
+    m.title = `${L.t} · ${L.d}`;
+    const o = new CSS2DObject(m); o.position.copy(ecef(lens.lat, lens.lon - 0.12, (L.z0 + L.z1) / 2));  // 11 km west of the lens, inside the slab
+    o.center.set(0.5 + (i - (LAY.length - 1) / 2) * 1.4, 0.5);  // side by side, so they never pile up
+    scene.add(o); tags.push(o);
   });
   $('layersList').innerHTML = LAY.map((L, i) => `<li><i style="background:${L.c}">${i + 1}</i><b>${L.t}</b><span>${L.d}</span></li>`).join('');
 }
@@ -310,7 +331,7 @@ $('simPlay').addEventListener('click', () => {
     if (t < 120) cm1Play = requestAnimationFrame(step); else { cm1Play = null; $('simPlay').textContent = '▶ הפעלת השעתיים'; } };
   cm1Play = requestAnimationFrame(step);
 });
-$('tags').addEventListener('change', () => { labels.domElement.hidden = !$('tags').checked; $('layersCard').hidden = !$('tags').checked; });
+$('tags').addEventListener('change', () => { const on = $('tags').checked; labels.domElement.hidden = !on; $('layersCard').hidden = !on; sheets.visible = on; });
 if (innerWidth < 760) $('layersCard').open = false;
 
 // ---------- formation in real time: cap, then the lower plate, then the upper plate, each from its core outward

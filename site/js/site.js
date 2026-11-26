@@ -82,6 +82,7 @@ function onResult(r) {
   viz.field = r; curtain.field = r; xs.setField(r); xs.setBlockFactor(state.params.blockFactor); chart.setField(r);
   if (!ref && state.preset === 'sunset') { ref = r.diag; lab.setReference(r.diag); }
   geometry(); anchors = computeAnchors(r); applyCallouts(); focusRef?.refresh();
+  if (vol && !vol.useCM1) vol.fromField(r);
   lab.onResult(r, state.params);
   if (state.mode === 'lab') { const v = $('verdict'); say(v.querySelector('strong')?.textContent + '. ' + (v.querySelector('p')?.textContent || '')); }
   S.invalidate();
@@ -169,7 +170,7 @@ function applyCallouts() { viz.setCallouts(calloutIds.filter(id => anchors[id]).
 
 // ---------- visuals
 function applyVisuals() {
-  S.setExaggeration(state.exag); clouds.setExag(state.exag); viz.setExag(state.exag); curtain.setExag(state.exag);
+  S.setExaggeration(state.exag); clouds.setExag(state.exag); vol?.setExag(state.exag); viz.setExag(state.exag); curtain.setExag(state.exag);
   const L = state.layers;
   parcels.visible = L.flow; S.labels.visible = L.labels; S.rotors.visible = L.rotors; S.column.visible = !!L.wind;
   if (state.mode === 'lab') { tw.sunT = state.sun; tw.loop = null; }
@@ -177,7 +178,7 @@ function applyVisuals() {
   S.invalidate();
 }
 function setSunNow(e) {
-  const sun = S.setSun(e), u = clouds.uniforms;
+  const sun = S.setSun(e), u = clouds.uniforms; vol?.setSunLocal(sun.dir);
   u.uSunDir.value.copy(sun.dir); u.uSunColor.value.copy(sun.color); u.uShadowKm.value = sun.shadowKm;
   const t = THREE.MathUtils.clamp((e + 4) / 12, 0, 1);
   u.uAmbTop.value.setRGB(0.14 + 0.28 * t, 0.15 + 0.32 * t, 0.26 + 0.4 * t);
@@ -285,6 +286,7 @@ function showPhoto(on) {
   const s = STEPS[step], p = $('pip');
   if (on && s?.photo) { $('pipImg').src = s.photo[0]; $('pipImg').alt = s.photo[1]; $('pipCap').textContent = s.photo[1]; }
   p.hidden = !(on && s?.photo); $('photoBtn').setAttribute('aria-pressed', String(!p.hidden));
+  if (!p.hidden) focusOnly('photo');
 }
 $('photoBtn').addEventListener('click', () => showPhoto($('pip').hidden));
 $('pipClose').addEventListener('click', () => showPhoto(false));
@@ -377,9 +379,10 @@ const learn = initLearn($('learn'), (tr) => {
   if (mobile) learn.close();
   toast(`${tr.label}: הזיזו את המחוון המסומן וראו מה קורה לעדשה`);
 });
-$('learnBtn').addEventListener('click', () => (learn.isOpen ? learn.close() : learn.open(null, $('learnBtn'))));
-$('stepLearn').addEventListener('click', (e) => learn.open(e.currentTarget.dataset.topic, e.currentTarget));
-$('readouts').addEventListener('click', (e) => { const b = e.target.closest?.('[data-topic]'); if (b) learn.open(b.dataset.topic, b); });
+const openLearn = (id, from) => { focusOnly('learn'); learn.open(id, from); };
+$('learnBtn').addEventListener('click', () => (learn.isOpen ? learn.close() : openLearn(null, $('learnBtn'))));
+$('stepLearn').addEventListener('click', (e) => openLearn(e.currentTarget.dataset.topic, e.currentTarget));
+$('readouts').addEventListener('click', (e) => { const b = e.target.closest?.('[data-topic]'); if (b) openLearn(b.dataset.topic, b); });
 
 // ---------- story director
 let step = 0, playing = false, stepT0 = performance.now();
@@ -652,6 +655,7 @@ function autoDowngrade() {
 function frame(now) {
   requestAnimationFrame(frame);
   if (document.hidden) return;
+  if (vol?.active) { vol.setAmount(tw.cloud); vol.render(S.camera); volWatch(now); }
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   let moving = S.updateFly(now);
   if (focus.update(now, S.camera)) moving = true;
@@ -676,7 +680,7 @@ function frame(now) {
     if (S.isSharp) { S.sharp(false); clouds.setScale(INTER.scale); clouds.uniforms.uSteps.value = Math.min(clouds.uniforms.uSteps.value, INTER.steps); }
     lastMove = now;
     const t0 = performance.now();
-    clouds.render(S.scene, S.camera, now / 1000);
+    if (vol?.active) S.renderer.render(S.scene, S.camera); else clouds.render(S.scene, S.camera, now / 1000);
     S.labelRenderer.render(S.scene, S.camera);
     if (now - lastCull > 180) { S.labels.cull(S.camera, innerWidth, innerHeight); lastCull = now; }
     S.dirty = false;
@@ -688,7 +692,7 @@ function frame(now) {
   else if (!S.isSharp && INTER.sharp && now - lastMove > 320) {
     // at rest: one sharp frame at full resolution with full-quality clouds
     S.sharp(true); clouds.setScale(1); const keep = clouds.uniforms.uSteps.value; clouds.uniforms.uSteps.value = 320;
-    clouds.render(S.scene, S.camera, now / 1000); S.labelRenderer.render(S.scene, S.camera);
+    if (vol?.active) S.renderer.render(S.scene, S.camera); else clouds.render(S.scene, S.camera, now / 1000); S.labelRenderer.render(S.scene, S.camera);
     clouds.uniforms.uSteps.value = keep;
   }
   if (state.mode === 'lab' && $('research').open && now - lastXs > 40) { xs.draw(); lastXs = now; }
@@ -723,7 +727,7 @@ $('studioCta').addEventListener('click', enterFocus);
 
 // ---------- one menu, two docks: everything else stays off the map until asked for
 function menu(open) {
-  const m = $('menu'); open = open ?? m.hidden; m.hidden = !open; $('menuBtn').setAttribute('aria-expanded', String(open));
+  const m = $('menu'); open = open ?? m.hidden; if (open) focusOnly('menu'); m.hidden = !open; $('menuBtn').setAttribute('aria-expanded', String(open));
   if (open) { m.querySelector('button:not([style*="none"])')?.focus(); }
 }
 $('menuBtn').addEventListener('click', () => menu());
@@ -740,8 +744,17 @@ function setDock(which, open, persist = true) {
   }
   if (persist) try { localStorage.setItem('lenticular.docks', JSON.stringify({ l: !$('layersPanel').hidden, t: !$('toolsPanel').hidden })); } catch { /* private mode */ }
 }
-$('layersPeek').addEventListener('click', () => setDock('layersPanel'));
-$('toolsPeek').addEventListener('click', () => setDock('toolsPanel'));
+$('layersPeek').addEventListener('click', () => { if ($('layersPanel').hidden) focusOnly('docks'); setDock('layersPanel'); });
+$('toolsPeek').addEventListener('click', () => { if ($('toolsPanel').hidden) focusOnly('docks'); setDock('toolsPanel'); });
+// one focus at a time: whatever the visitor opens now takes the screen, the rest folds out of the way.
+// The drawers can both stay open (they stack); the photo, the learn drawer and the menu each stand alone.
+function focusOnly(kind) {
+  if (kind !== 'photo' && !$('pip').hidden) { $('pip').hidden = true; $('photoBtn').setAttribute('aria-pressed', 'false'); }
+  if (kind !== 'learn' && learn.isOpen) learn.close();
+  if (kind !== 'menu' && !$('menu').hidden) { $('menu').hidden = true; $('menuBtn').setAttribute('aria-expanded', 'false'); }
+  if (kind === 'photo' || kind === 'learn') { setDock(null, false, false); if (!$('layerPanel').hidden) $('layerPanel').hidden = true; }
+  if (!$('qualityMenu').hidden) $('qualityMenu').hidden = true;
+}
 { // open on wide screens unless the visitor folded them before
   let d = null; try { d = JSON.parse(localStorage.getItem('lenticular.docks')); } catch { /* none */ }
   const wide = innerWidth >= 900;
@@ -750,6 +763,38 @@ $('toolsPeek').addEventListener('click', () => setDock('toolsPanel'));
 // touching the map closes the menu; the drawers stay as the visitor left them
 S.renderer.domElement.addEventListener('pointerdown', () => { menu(false); if (!$('qualityMenu').hidden) { $('qualityMenu').hidden = true; } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null, false); } });
+
+// ---------- the volumetric main view (physical sky, volumetric clouds); the classic view stays as fallback
+let vol = null, volSlow = 0, volLast = 0;
+function volWatch(now) { // too slow for this device: back to the classic view, and say so
+  if (location.search.includes('volforce')) return;  // testing: keep the volumetric view whatever the speed
+  const dt = volLast ? now - volLast : 16; volLast = now;
+  volSlow = dt > 75 ? volSlow + dt : Math.max(0, volSlow - dt);
+  if (volSlow > 4000) { setVolume(false); toast('התצוגה הנפחית כבדה למכשיר הזה, עברנו לתצוגה הקלה · אפשר לחזור אליה בכלים'); }
+}
+function setVolume(on) {
+  if (!vol) return;
+  vol.active = on; S.setOverlay(on); clouds.enabled = !on && tw.cloud > 0.01; volSlow = 0; volLast = 0;
+  $('volBtn')?.setAttribute('aria-pressed', String(on));
+  try { localStorage.setItem('lenticular.volume', on ? '1' : '0'); } catch { /* private mode */ }
+  S.invalidate();
+}
+async function startVolume() {
+  let pref = null; try { pref = localStorage.getItem('lenticular.volume'); } catch { /* none */ }
+  if (mobile || pref === '0' || !document.createElement('canvas').getContext('webgl2')) return;
+  try {
+    const { createVolume } = await import('./volume.js');
+    vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel === 'high' ? 'high' : 'medium' });
+    vol.setExag(state.exag); if (field) vol.fromField(field);
+    setSunNow(tw.sun); setVolume(true);
+  } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
+}
+$('volBtn')?.addEventListener('click', () => { if (!vol) return startVolume(); setVolume(!vol.active); });
+$('cm1Btn')?.addEventListener('click', async () => {
+  if (!vol) return;
+  vol.useCM1 = !vol.useCM1; $('cm1Btn').setAttribute('aria-pressed', String(vol.useCM1));
+  if (vol.useCM1) { await vol.fromCM1(120); toast('העננים עכשיו מהסימולציה התלת־ממדית (CM1) של אותו ערב'); } else if (field) vol.fromField(field);
+});
 
 // ---------- start
 const startHash = location.hash;
@@ -780,6 +825,7 @@ const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDo
 $('tourChip').addEventListener('click', () => siteTour.start());
 if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !focus.isOn) siteTour.start(); }, 2200);
 requestAnimationFrame(frame);
+startVolume();
 setTimeout(() => $('hint').classList.add('gone'), 9000);
 setTimeout(() => { $('loader').classList.add('done'); setTimeout(() => $('loader').remove(), 700); }, 400);
 window.__lent = { S, state, viz, curtain, clouds, get field() { return field; }, get anchors() { return anchors; }, go, setMode };

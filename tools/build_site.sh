@@ -24,6 +24,7 @@ H
 # version stamp on the entry assets so a new deploy never mixes with a cached stylesheet
 STAMP=$(date +%s)
 sed -i "s|href=\"site.css\"|href=\"site.css?v=$STAMP\"|; s|src=\"js/site.js\"|src=\"js/site.js?v=$STAMP\"|" "$OUT/index.html"
+sed -i -E "s#src=\"js/(proto|kids)\.js\"#src=\"js/\1.js?v=$STAMP\"#" "$OUT/proto.html" "$OUT/kids.html"
 # and on every module import, so no browser mixes a new module with a cached one
 sed -i -E "s#(from '\./[a-z0-9_]+\.js)'#\1?v=$STAMP'#g; s#(import\('\./[a-z0-9_]+\.js)'#\1?v=$STAMP'#g; s#(new URL\('\./[a-z0-9_]+\.js)'#\1?v=$STAMP'#g" "$OUT"/js/*.js
 echo "built $OUT: $(find "$OUT" -type f | wc -l) files, $(du -sh "$OUT" | cut -f1)"

@@ -510,3 +510,13 @@ body.focusing .hint { display: none; }
 .menu .menu-link { display: grid; gap: 2px; text-align: start; padding: 10px 12px; border-radius: 10px; color: var(--ink); font-size: .95rem; text-decoration: none; }
 .menu .menu-link:hover, .menu .menu-link:focus-visible { background: rgb(255 255 255 / .07); }
 .menu .menu-link small { color: var(--ink-3); font-size: .76rem; }
+
+/* the header (and its menu) sits above the drawers and panels */
+.hud-top { z-index: 45; }
+.menu { z-index: 46; }
+
+/* volumetric main view: its canvas sits under the stage canvas */
+#stage canvas.volume { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+#stage > canvas:not(.volume) { position: relative; z-index: 1; }
+.dock .maptools #volBtn[aria-pressed="true"], .dock .maptools #cm1Btn[aria-pressed="true"] { background: rgb(255 159 184 / .22); }
+@media (min-width: 900px) { .legend { left: auto !important; right: auto !important; inset-inline-start: 50% !important; transform: translateX(50%); bottom: 18px !important; top: auto !important; } }
