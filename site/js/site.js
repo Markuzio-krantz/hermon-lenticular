@@ -632,7 +632,7 @@ const QUALITY = {
   low: { dpr: 1.0, scale: 0.45, steps: 110, sharp: false, tag: 'LO' },
 };
 const INTER = { scale: 0.65, steps: 190, sharp: true };
-let qualityMode = 'auto', qualityLevel = mobile ? 'low' : 'high';
+let qualityMode = 'auto', qualityLevel = mobile ? 'medium' : 'high';
 try { qualityMode = localStorage.getItem('lenticular.quality') || 'auto'; } catch { /* private mode */ }
 function applyQuality(level) {
   qualityLevel = level; const q = QUALITY[level];
@@ -645,7 +645,7 @@ function applyQuality(level) {
 }
 function setQualityMode(m) {
   qualityMode = m; try { localStorage.setItem('lenticular.quality', m); } catch { /* ignore */ }
-  applyQuality(m === 'auto' ? (mobile ? 'low' : 'high') : m);
+  applyQuality(m === 'auto' ? (mobile ? 'medium' : 'high') : m);
 }
 for (const b of $('qualityMenu').querySelectorAll('button')) b.addEventListener('click', () => { setQualityMode(b.dataset.q); $('qualityMenu').hidden = true; document.querySelector('[data-t=quality]').setAttribute('aria-expanded', 'false'); toast(`איכות: ${b.firstChild.textContent.trim()}`); });
 setQualityMode(qualityMode);
@@ -773,7 +773,10 @@ var vol = null; let volSlow = 0, volLast = 0, cm1LabNote = false;
 function cm1Anchors() {
   const on = !!(vol?.active && vol.useCM1 && vol.cm1Peak);
   CALLOUT_TEXT._lens ??= CALLOUT_TEXT.lens;
-  CALLOUT_TEXT.lens = on ? 'עדשות · 4–5 ק"מ (סימולציה)' : CALLOUT_TEXT._lens;
+  CALLOUT_TEXT.lens = on ? (innerWidth < 600 ? 'עדשות · 4–5 ק"מ' : 'עדשות · 4–5 ק"מ (סימולציה)') : CALLOUT_TEXT._lens;
+  const pk = on ? vol.cm1Peak : null, hadAim = !!S._aimOn;
+  S.setAim(pk ? [pk[0], pk[2], -pk[1]] : null); S._aimOn = !!pk;
+  if (!!pk !== hadAim && state.mode === 'story') setView(STEPS[step].view, 1400);  // re-frame once the lens is known
   if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; }
   if (anchors) applyCallouts();
 }  // var: the quality code above already asks for it
@@ -796,10 +799,10 @@ function setVolume(on, persist = true) {
 }
 async function startVolume() {
   let pref = null; try { pref = localStorage.getItem('lenticular.volume2'); } catch { /* none */ }
-  if (mobile || pref === '0' || !document.createElement('canvas').getContext('webgl2')) return;
+  if (pref === '0' || !document.createElement('canvas').getContext('webgl2')) return;  // phones too: the full view is the main view everywhere
   try {
     const { createVolume } = await import('./volume.js');
-    vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel });
+    vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: mobile ? null : 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel });  // phones skip the land-cover tint to save GPU memory
     vol.setExag(state.exag);
     // the clouds come from the CM1 run in the GPU cloud (the evening of 19.11); the site's own linear model is the backup
     try { await vol.fromCM1(120); vol.useCM1 = true; } catch (e) { console.warn('CM1 field unavailable, using the linear model', e); vol.useCM1 = false; if (field) vol.fromField(field); }

@@ -240,7 +240,8 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
     hermon: { pos: [-13, 13, -4], target: [12.8, 4.5, -18.5] },
     top: { pos: [0.01, 150, 0.01], target: [0, 0, 0] },
   };
-  let fly = null;
+  let fly = null, aim = null;  // aim: a point the narrow (portrait) view leans toward, e.g. the simulated lens
+  function setAim(p, k = 0.55) { aim = p ? { p: new THREE.Vector3(...p), k } : null; }
   function goTo(name, ms = 1600) {
     let pos, tgt;
     if (name === 'hula') {
@@ -250,6 +251,10 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
       const v = V[name]; if (!v) return;
       pos = new THREE.Vector3(...v.pos); tgt = new THREE.Vector3(...v.target);
       if (name !== 'top' && name !== 'region') { pos.y *= exag / 2; tgt.y *= exag / 2; }
+    }
+    if (aim && name !== 'top' && name !== 'region' && camera.aspect < 0.85) {
+      // a phone held upright sees a narrow slice: turn toward the lens so it stays on screen
+      const a = aim.p.clone(); a.y *= exag; tgt.lerp(a, aim.k);
     }
     fly = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: tgt, start: performance.now(), ms: Math.max(1, ms) };
     invalidate();
@@ -278,7 +283,7 @@ export function createStage(container, { heights, res, places, satURL, satLowURL
   return {
     renderer, labelRenderer, scene, camera, controls, terrain, column, slice, rotors, labels, boxLine,
     get exag() { return exag; }, get flying() { return !!fly; }, get dirty() { return dirty; }, set dirty(v) { dirty = v; },
-    setOverlay, get overlay() { return overlay; },
+    setOverlay, get overlay() { return overlay; }, setAim,
     invalidate, adapt, setDprCap, sharp, get isSharp() { return hi; }, setFrameOffset, setExaggeration, setSun, setColumn, setSlice, setRotors, goTo, goToPose, updateFly, pickGround, pickRay, zoom, groundAt: hAt,
   };
 }
