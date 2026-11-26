@@ -533,3 +533,7 @@ body.focusing .hint { display: none; }
 @media (prefers-reduced-motion: reduce) { .kids-corner .kc-icon { animation: none; } }
 @media (max-width: 899px) { .kids-corner { top: 64px; bottom: auto; left: auto; right: 12px; padding: 6px 12px 6px 8px; } .kids-corner .kc-icon { font-size: 1.25rem; } .kids-corner small { display: none; } }
 body.focusing .kids-corner { display: none; }
+
+/* the map keeps its canvases inside its own stack, so nothing drawn there can rise over the drawers */
+.stage { z-index: 0; }
+button, summary, [role=button] { touch-action: manipulation; }

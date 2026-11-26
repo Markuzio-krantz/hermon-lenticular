@@ -39,6 +39,13 @@
   .layers-card li i { grid-row: span 2; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 600 .72rem 'IBM Plex Mono', monospace; font-style: normal; color: #14121a; }
   .layers-card li b { font-weight: 500; } .layers-card li span { color: var(--ink-3); font-size: .72rem; }
   .layers-card > p { margin: 0; color: var(--ink-3); font-size: .7rem; }
+  /* the header bar only takes taps on its own buttons, never on the empty space over the card */
+  .bar { pointer-events: none; } .bar > * { pointer-events: auto; }
+  button, summary, input, label { touch-action: manipulation; }
+  @media (max-width: 760px) {
+    .layers-card { top: 104px; inset-inline-end: 12px; width: min(300px, calc(100vw - 24px)); max-height: calc(100svh - 180px); overflow-y: auto; }
+    .panel { max-height: calc(100svh - 168px); }  /* ends below the card's title, so both stay tappable */
+  }
   .mark { left: 0; top: 0; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 600 .68rem 'IBM Plex Mono', monospace; color: #14121a; box-shadow: 0 0 0 2px rgb(0 0 0 / .35); }
   .ladder { left: 0; top: 0; display: grid; gap: 4px; padding: 8px 10px; border-radius: 12px; background: rgb(12 14 22 / .74); border: 1px solid var(--hair); margin-inline-end: 14px; }
   .ladder p { margin: 0 0 2px; font-size: .74rem; color: var(--accent); }

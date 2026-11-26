@@ -203,7 +203,12 @@ $('time').addEventListener('input', setTime); setTime();
 $('cov').addEventListener('input', () => { clouds.coverage = +$('cov').value; $('o-cov').textContent = (+$('cov').value).toFixed(2); });
 $('o-cov').textContent = '0.62';
 $('hide').addEventListener('click', () => { const p = document.querySelector('.panel'); const on = p.classList.toggle('folded'); $('hide').textContent = on ? 'כוונון' : 'הסתרה'; $('hide').setAttribute('aria-expanded', String(!on)); });
-if (matchMedia('(max-width: 760px)').matches) { $('q').value = 0; document.querySelector('.panel').classList.add('folded'); $('hide').textContent = 'כוונון'; }
+// on a phone the card and the panel share the screen: opening one folds the other
+const narrow = matchMedia('(max-width: 760px)');
+function foldPanel() { const pn = document.querySelector('.panel'); if (pn.classList.contains('folded')) return; pn.classList.add('folded'); $('hide').textContent = 'כוונון'; $('hide').setAttribute('aria-expanded', 'false'); }
+$('layersCard').querySelector('summary').addEventListener('click', () => { if (narrow.matches && !$('layersCard').open) foldPanel(); });
+$('hide').addEventListener('click', () => { if (narrow.matches && !document.querySelector('.panel').classList.contains('folded')) $('layersCard').open = false; });
+if (matchMedia('(max-width: 760px)').matches) { $('layersCard').open = false; $('q').value = 0; document.querySelector('.panel').classList.add('folded'); $('hide').textContent = 'כוונון'; }
 const QN = ['low', 'medium', 'high', 'ultra'], QH = ['חסכונית', 'בינונית', 'גבוהה', 'מרבית'];
 function setQ() { const i = +$('q').value; clouds.qualityPreset = QN[i]; $('o-q').textContent = QH[i]; }
 $('q').addEventListener('input', setQ); setQ();
