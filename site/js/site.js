@@ -82,7 +82,9 @@ function onResult(r) {
   viz.field = r; curtain.field = r; xs.setField(r); xs.setBlockFactor(state.params.blockFactor); chart.setField(r);
   if (!ref && state.preset === 'sunset') { ref = r.diag; lab.setReference(r.diag); }
   geometry(); anchors = computeAnchors(r); applyCallouts(); focusRef?.refresh();
+  cm1Anchors();
   if (vol && !vol.useCM1) vol.fromField(r);
+  else if (vol?.useCM1 && state.mode === 'lab' && !cm1LabNote) { cm1LabNote = true; toast('העננים כאן הם מסימולציית הענן (CM1) של ערב 19.11 ולא משתנים עם המחוונים · לראות את ההשפעה: כפתור CM1 בכלים עובר למודל הגיבוי'); }
   lab.onResult(r, state.params);
   if (state.mode === 'lab') { const v = $('verdict'); say(v.querySelector('strong')?.textContent + '. ' + (v.querySelector('p')?.textContent || '')); }
   S.invalidate();
@@ -766,7 +768,15 @@ S.renderer.domElement.addEventListener('pointerdown', () => { menu(false); if (!
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null, false); } });
 
 // ---------- the volumetric main view (physical sky, volumetric clouds); the classic view stays as fallback
-var vol = null; let volSlow = 0, volLast = 0;  // var: the quality code above already asks for it
+var vol = null; let volSlow = 0, volLast = 0, cm1LabNote = false;
+// with the CM1 clouds on screen, the lens labels point at the simulated lens, not the linear model's
+function cm1Anchors() {
+  const on = !!(vol?.active && vol.useCM1 && vol.cm1Peak);
+  CALLOUT_TEXT._lens ??= CALLOUT_TEXT.lens;
+  CALLOUT_TEXT.lens = on ? 'עדשות · 4–5 ק"מ (סימולציה)' : CALLOUT_TEXT._lens;
+  if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; }
+  if (anchors) applyCallouts();
+}  // var: the quality code above already asks for it
 function volWatch(now) { // too slow for this device: step the quality down first, and only then the classic view
   if (location.search.includes('volforce')) return;  // testing: keep the volumetric view whatever the speed
   const dt = volLast ? now - volLast : 16; volLast = now;
@@ -780,6 +790,7 @@ function setVolume(on, persist = true) {
   if (!vol) return;
   vol.active = on; S.setOverlay(on); clouds.enabled = !on && tw.cloud > 0.01; volSlow = 0; volLast = 0;
   $('volBtn')?.setAttribute('aria-pressed', String(on));
+  if (field) { anchors = computeAnchors(field); cm1Anchors(); }
   if (persist) try { localStorage.setItem('lenticular.volume2', on ? '1' : '0'); } catch { /* private mode */ }  // only the visitor's own choice is remembered
   S.invalidate();
 }
@@ -789,15 +800,19 @@ async function startVolume() {
   try {
     const { createVolume } = await import('./volume.js');
     vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel });
-    vol.setExag(state.exag); if (field) vol.fromField(field);
-    setSunNow(tw.sun); setVolume(true);
+    vol.setExag(state.exag);
+    // the clouds come from the CM1 run in the GPU cloud (the evening of 19.11); the site's own linear model is the backup
+    try { await vol.fromCM1(120); vol.useCM1 = true; } catch (e) { console.warn('CM1 field unavailable, using the linear model', e); vol.useCM1 = false; if (field) vol.fromField(field); }
+    $('cm1Btn')?.setAttribute('aria-pressed', String(vol.useCM1));
+    setSunNow(tw.sun); setVolume(true); cm1Anchors();
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
 }
 $('volBtn')?.addEventListener('click', () => { if (!vol) return startVolume(); setVolume(!vol.active); });
 $('cm1Btn')?.addEventListener('click', async () => {
   if (!vol) return;
   vol.useCM1 = !vol.useCM1; $('cm1Btn').setAttribute('aria-pressed', String(vol.useCM1));
-  if (vol.useCM1) { await vol.fromCM1(120); toast('העננים עכשיו מהסימולציה התלת־ממדית (CM1) של אותו ערב'); } else if (field) vol.fromField(field);
+  if (vol.useCM1) { await vol.fromCM1(120); toast('העננים מסימולציית הענן (CM1) של ערב 19.11'); } else { if (field) vol.fromField(field); toast('מודל הגיבוי: המודל הלינארי, מגיב למחוונים'); }
+  if (field) anchors = computeAnchors(field); cm1Anchors();
 });
 
 // ---------- start
