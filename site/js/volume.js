@@ -148,7 +148,7 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
   }
   // from the CM1 3-D simulation (two plates), at a time in minutes
   let cm1 = null;
-  let cm1Peak = null;
+  let cm1Peak = null, cm1Frame = null;
   async function fromCM1(tMin = 120) {
     if (!cm1) {
       const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_weather.bin').then((r) => r.arrayBuffer())]);
@@ -167,6 +167,7 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const v = px(f1, 0, i, j) + px(f1, 1, i, j); if (v > best) { best = v; bi = i; bj = j; } }
     const s = meta.s0_km + bi * dk, c = meta.c0_km + bj * dk;
     cm1Peak = [sx + s * ca - c * sa, sn + s * sa + c * ca, (meta.bands_km[0][0] + meta.bands_km[1][1]) / 2];
+    cm1Frame = { sx, sn, ca, sa, f: f1 };
     writeWeather((b, x, n) => {
       if (b > 1) return 0;
       const dx = x - sx, dn = n - sn, s = dx * ca + dn * sa, c = -dx * sa + dn * ca;
@@ -193,14 +194,19 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
   }
   function setExag(e) { exag = e; ground.scale.set(1, 1, e); applyLayers(); }
   function setAmount(a) { if (Math.abs(a - amount) < 0.01) return; amount = a; applyLayers(); }
+  const THIN = [1, 0.8, 0.65, 0.5]; let thin = 0, qNow = quality;
+  function pr() { renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR[qNow] ?? 1.25) * THIN[thin]); resize(); }
   function resize() { const w = container.clientWidth, h = container.clientHeight; renderer.setSize(w, h, false); composer.setSize(w, h); }
   resize(); addEventListener('resize', resize);
   let active = true;
   return {
     canvas, clouds, aerial,
     render(stageCamera) { if (!active) return; syncCamera(stageCamera); reanchor(); composer.render(); },
-    get cm1Peak() { return cm1Peak; },
-    fromField, fromCM1, setSunLocal, setExag, setAmount, setQuality(q) { clouds.qualityPreset = q; renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR[q] ?? 1.25)); resize(); },
+    get cm1Peak() { return cm1Peak; }, get cm1Frame() { return cm1Frame; },
+    fromField, fromCM1, setSunLocal, setExag, setAmount,
+    setQuality(q) { clouds.qualityPreset = q; qNow = q; thin = 0; pr(); },
+    // below 'low': fewer pixels, same clouds; true while there is still a step left
+    thinner() { if (thin >= THIN.length - 1) return false; thin++; pr(); return true; },
     set active(v) { active = v; canvas.hidden = !v; }, get active() { return active; },
     resize,
   };

@@ -537,3 +537,20 @@ body.focusing .kids-corner { display: none; }
 /* the map keeps its canvases inside its own stack, so nothing drawn there can rise over the drawers */
 .stage { z-index: 0; }
 button, summary, [role=button] { touch-action: manipulation; }
+
+/* phones: the first-visit offer of the tour sits above the story card */
+.tour-offer { position: fixed; z-index: 45; left: 12px; right: 12px; background: #171a26; border: 1px solid var(--hair-2); border-radius: 14px; padding: 12px 14px; box-shadow: 0 16px 40px rgb(0 0 0 / .5); }
+.tour-offer p { margin: 0 0 10px; font-size: .9rem; color: var(--ink-2); } .tour-offer b { color: var(--ink); }
+.tour-offer .row { display: flex; justify-content: space-between; gap: 8px; } .tour-offer .btn { min-height: 40px; padding: 0 16px; }
+body.focusing .tour-offer, body.touring .tour-offer { display: none; }
+@media (max-width: 899px) { .toast { max-width: calc(100vw - 24px); width: max-content; border-radius: 14px; font-size: .82rem; line-height: 1.4; text-align: center; } }
+/* pull-to-refresh indicator */
+.ptr { position: fixed; z-index: 95; top: 0; left: 50%; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: #10131a; display: grid; place-items: center; transform: translate(-50%, -50px); box-shadow: 0 6px 20px rgb(0 0 0 / .4); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.ptr.on { opacity: 1; } .ptr.ready { background: var(--accent); } .ptr.go { transition: transform .2s; }
+.ptr svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* a place name under a panel or a callout steps aside */
+.pl.covered { opacity: 0 !important; }
+
+/* phones: the focus view is in the menu; the story card keeps only the story */
+@media (max-width: 899px) { .story .studio-cta { display: none !important; } }

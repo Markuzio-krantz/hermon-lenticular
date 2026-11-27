@@ -101,7 +101,7 @@ function geometry() {
   if (!field) return;
   const a = windAngle(), c = HERMON;
   const up = [Math.max(-30, Math.min(30, c[0] - Math.cos(a) * 26)), Math.max(-30, Math.min(30, c[1] - Math.sin(a) * 26))];
-  xs.setSlice(c, a, 30); S.setSlice(c, a, 60); viz.setJourney(c, a); curtain.setPath([c[0] - Math.cos(a) * 3, c[1] - Math.sin(a) * 3], a);
+  xs.setSlice(c, a, 30); S.setSlice(c, a, 60); viz.setJourney(c, a); curtainPath(c, a);
   parcels.setMode(flowMode, { cx: up[0], cn: up[1], ang: a });
   S.setColumn(field.prof, up);
   S.setRotors(field.rotor, field.inner, field.ground, a);
@@ -111,6 +111,25 @@ function geometry() {
 
 // ---------- callout anchors from the computed field
 let anchors = {}, focusRef = null;
+// the formation curtain: with the CM1 clouds on screen it shows the CM1 cut along the wind through the summit
+let cm1Cut = null;
+function curtainPath(c, a) {
+  const F = cm1Cut && vol?.active && vol.useCM1 ? vol.cm1Frame : null;
+  if (F) { curtain.setPath([F.sx - F.ca * 3, F.sn - F.sa * 3], Math.atan2(F.sa, F.ca)); curtain.setCM1({ ...cm1Cut, ...F }); }
+  else { curtain.setPath([c[0] - Math.cos(a) * 3, c[1] - Math.sin(a) * 3], a); curtain.setCM1(null); }
+}
+async function loadCM1Cut() {
+  const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_xz.bin').then((r) => r.arrayBuffer())]);
+  if (!meta.xz) return; cm1Cut = { meta, data: new Uint8Array(buf) };
+}
+// where the cut's own cloud starts and ends: the labels "enters / leaves the cloud" point there
+function cm1CutAnchors(F) {
+  const m = cm1Cut.meta, X = m.xz, nx = m.nx, base = F.f * 2 * X.nz * nx + X.nz * nx, d = cm1Cut.data;
+  let s0 = Infinity, s1 = -Infinity, zs = 0, n = 0;
+  for (let k = 0; k < X.nz; k++) for (let i = 0; i < nx; i++) if (d[base + k * nx + i] > 60) { const s = m.s0_km + i * m.dx_km; s0 = Math.min(s0, s); s1 = Math.max(s1, s); zs += X.z0_km + k * X.dz_km; n++; }
+  if (!n) return null; const z = zs / n, at = (s) => [F.sx + s * F.ca, F.sn + s * F.sa, z];
+  return { enter: at(s0), exit: at(s1), birth: at((s0 + s1) / 2) };
+}
 function computeAnchors(r) {
   const [nx, ny, nz] = r.volDims, dz = 8 / nz, cell = 64 / nx, A = {};
   const L = [0, 0, 0, 0], C = [0, 0, 0, 0]; let pk = 0;
@@ -190,7 +209,12 @@ function setSunNow(e) {
 function setView(v, ms = 2200) {
   if (v === 'curtain') {
     const a = windAngle(), px = Math.sin(a), pn = -Math.cos(a), c = [HERMON[0] - Math.cos(a) * 3, HERMON[1] - Math.sin(a) * 3], e = state.exag;
-    S.goToPose([c[0] + px * 30, 3.4 * e, -(c[1] + pn * 30)], [c[0], 3.4 * e, -c[1]], reduceMotion ? 1 : ms);
+    // stand back far enough that the whole cut fits the width, the humidity strip at its upstream end included
+    const hf = 2 * Math.atan(Math.tan(S.camera.fov * Math.PI / 360) * S.camera.aspect);
+    // portrait phones cannot fit 52 km across: they get the wave over the summit and the cloud, large
+    const tall = S.camera.aspect < 0.85, d = tall ? 52 : Math.max(30, Math.min(60, 28 / Math.tan(hf / 2)));
+    if (tall) { c[0] += Math.cos(a) * 7; c[1] += Math.sin(a) * 7; }
+    S.goToPose([c[0] + px * d, 3.6 * e, -(c[1] + pn * d)], [c[0], 3.6 * e, -c[1]], reduceMotion ? 1 : ms);
   } else S.goTo(v, reduceMotion ? 1 : ms);
   for (const b of $('views').children) b.setAttribute('aria-pressed', String(b.dataset.v === v));
 }
@@ -296,7 +320,9 @@ $('pipClose').addEventListener('click', () => showPhoto(false));
 // ---------- status for screen readers, toast, share links
 const say = (t) => { $('srStatus').textContent = t; };
 let toastT = 0;
-function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2200); }
+function toast(t) {
+  const el = $('toast'); el.textContent = t; el.hidden = false;
+  if (innerWidth < 900) { const st = $('story'), r = st && !st.hidden && st.getClientRects().length ? st.getBoundingClientRect() : null; el.style.top = 'auto'; el.style.bottom = `${r ? innerHeight - r.top + 10 : 90}px`; } else { el.style.top = el.style.bottom = ''; } clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2200); }
 function setHash(h) { try { history.replaceState(null, '', `#${h}`); } catch { /* ignore */ } }
 const SHARE_KEYS = ['windScale', 'stabilityScale', 'lensBoost', 'layer2Boost', 'moistShift', 'uniformDir', 'upperBoost', 'rhOffset', 'blockFactor', 'decayLength'];
 function labHash() {
@@ -655,6 +681,52 @@ function autoDowngrade() {
   toast('התצוגה עברה לאיכות קלה יותר כדי לשמור על תנועה חלקה · אפשר לבחור איכות בכפתור המסומן');
   const qb = document.querySelector('[data-t=quality]'); qb.classList.remove('attn'); void qb.offsetWidth; qb.classList.add('attn');
 }
+// ---------- nothing on the map hides behind the panels, and nothing hides the map's own labels
+// the free area: below the header and the folded drawers' row, above the story card, clear of the open panels
+function chromeRects() {
+  const sel = ['.hud-top', '#docks > *', '#layersPanel', '#toolsPanel', '.kids-corner', '#story', '#lab', '#legend', '#toast', '.tour-offer', '#learn'];
+  const out = [];
+  for (const q of sel) for (const e of document.querySelectorAll(q)) {
+    if (e.hidden || !e.getClientRects().length) continue; const cs = getComputedStyle(e);
+    if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity < 0.1) continue;
+    const r = e.getBoundingClientRect(); if (r.width && r.height) out.push(r);
+  }
+  return out;
+}
+const hits = (a, b, m = 2) => a.left < b.right - m && b.left < a.right - m && a.top < b.bottom - m && b.top < a.bottom - m;
+// story callouts: slide each one into the free area, and apart from each other
+function keepCallouts() {
+  const els = [...document.querySelectorAll('.callout')].filter((e) => e.style.display !== 'none' && +getComputedStyle(e).opacity > 0.05);
+  if (!els.length) return;
+  const W = innerWidth, hb = document.querySelector('.hud-top')?.getBoundingClientRect().bottom || 50;
+  // phones: below the drawers' buttons and the kids button too
+  const top = (W < 900 ? Math.max(hb, ...[...document.querySelectorAll('#docks > *, .kids-corner')].map((e) => e.getBoundingClientRect()).filter((r) => r.height && r.top < 160).map((r) => r.bottom)) : hb) + 6;
+  const st = $('story'), stR = st && st.getClientRects().length ? st.getBoundingClientRect() : null;
+  const bottom = (innerWidth < 900 && stR ? stR.top : innerHeight) - 8;
+  const placed = [];
+  for (const el of els) {
+    const sp = el.firstElementChild; if (!sp) continue;
+    const ox = +sp.dataset.ox || 0, oy = +sp.dataset.oy || 0, r0 = sp.getBoundingClientRect();
+    const r = { left: r0.left - ox, right: r0.right - ox, top: r0.top - oy, bottom: r0.bottom - oy };
+    let dx = 0, dy = 0;
+    if (r.left < 8) dx = 8 - r.left; else if (r.right > W - 8) dx = W - 8 - r.right;
+    if (r.top < top) dy = top - r.top; else if (r.bottom > bottom) dy = bottom - r.bottom;
+    let R = { left: r.left + dx, right: r.right + dx, top: r.top + dy, bottom: r.bottom + dy };
+    for (const q of placed) if (hits(R, q, 0)) { const down = q.bottom + 4 - R.top; dy += R.bottom + down > bottom ? -(R.bottom - q.top + 4) : down; R = { left: r.left + dx, right: r.right + dx, top: r.top + dy, bottom: r.bottom + dy }; }
+    placed.push(R);
+    if (Math.abs(dx - ox) > 0.5 || Math.abs(dy - oy) > 0.5) { sp.dataset.ox = dx; sp.dataset.oy = dy; sp.style.transform = dx || dy ? `translate(${dx}px, ${dy}px)` : ''; }
+  }
+}
+// place names: hide the ones under a panel or under a story callout
+function declutter() {
+  const block = chromeRects();
+  for (const c of document.querySelectorAll('.callout span')) { const r = c.getBoundingClientRect(); if (r.width) block.push(r); }
+  for (const el of document.querySelectorAll('.pl')) {
+    if (el.classList.contains('off') || el.style.display === 'none') { el.classList.remove('covered'); continue; }
+    const r = el.getBoundingClientRect(), cov = !!r.width && (r.left < 4 || r.right > innerWidth - 4 || block.some((b) => hits(r, b)));  // cut by the screen edge counts as covered
+    el.classList.toggle('covered', cov); if (!cov && r.width) block.push(r);  // first come keeps its place: no two names on top of each other
+  }
+}
 function frame(now) {
   requestAnimationFrame(frame);
   if (document.hidden) return;
@@ -685,7 +757,8 @@ function frame(now) {
     const t0 = performance.now();
     if (vol?.active) S.renderer.render(S.scene, S.camera); else clouds.render(S.scene, S.camera, now / 1000);
     S.labelRenderer.render(S.scene, S.camera);
-    if (now - lastCull > 180) { S.labels.cull(S.camera, innerWidth, innerHeight); lastCull = now; }
+    if (now - lastCull > 180) { S.labels.cull(S.camera, innerWidth, innerHeight); lastCull = now; declutter(); }
+    keepCallouts();
     S.dirty = false;
     if (moving) {
       S.adapt(dt * 1000); slowAvg = slowAvg * 0.93 + dt * 1000 * 0.07;
@@ -761,14 +834,14 @@ function focusOnly(kind) {
 { // open on wide screens unless the visitor folded them before
   let d = null; try { d = JSON.parse(localStorage.getItem('lenticular.docks')); } catch { /* none */ }
   const wide = innerWidth >= 900;
-  setDock('layersPanel', d ? d.l : wide); setDock('toolsPanel', d ? d.t : wide);
+  setDock('layersPanel', d && !mobile ? d.l : wide); setDock('toolsPanel', d && !mobile ? d.t : wide);  // phones: everything folded except the story
 }
 // touching the map closes the menu; the drawers stay as the visitor left them
 S.renderer.domElement.addEventListener('pointerdown', () => { menu(false); if (!$('qualityMenu').hidden) { $('qualityMenu').hidden = true; } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (!$('menu').hidden) menu(false); else if (!$('layersPanel').hidden || !$('toolsPanel').hidden) setDock(null, false); } });
 
 // ---------- the volumetric main view (physical sky, volumetric clouds); the classic view stays as fallback
-var vol = null; let volSlow = 0, volLast = 0, cm1LabNote = false;
+var vol = null; let volSlow = 0, volLast = 0, cm1LabNote = false, volThinNote = false, volT0 = 0;
 // with the CM1 clouds on screen, the lens labels point at the simulated lens, not the linear model's
 function cm1Anchors() {
   const on = !!(vol?.active && vol.useCM1 && vol.cm1Peak);
@@ -777,21 +850,24 @@ function cm1Anchors() {
   const pk = on ? vol.cm1Peak : null, hadAim = !!S._aimOn;
   S.setAim(pk ? [pk[0], pk[2], -pk[1]] : null); S._aimOn = !!pk;
   if (!!pk !== hadAim && state.mode === 'story') setView(STEPS[step].view, 1400);  // re-frame once the lens is known
-  if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; }
+  if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; const cut = cm1Cut && vol.cm1Frame ? cm1CutAnchors(vol.cm1Frame) : null; if (cut) Object.assign(anchors, cut); }
+  geometry();
   if (anchors) applyCallouts();
 }  // var: the quality code above already asks for it
-function volWatch(now) { // too slow for this device: step the quality down first, and only then the classic view
+function volWatch(now) { // too slow for this device: step the quality down, then the resolution
   if (location.search.includes('volforce')) return;  // testing: keep the volumetric view whatever the speed
+  if (now - volT0 < 6000) { volLast = now; return; }  // shaders compiling and data arriving: not a measure of the device
   const dt = volLast ? now - volLast : 16; volLast = now;
   volSlow = dt > 75 ? volSlow + dt : Math.max(0, volSlow - dt);
   if (volSlow < 3000) return;
   volSlow = 0;
+  // the CM1 clouds stay on screen at every step: slow devices get fewer pixels, never the linear model
   if (qualityMode === 'auto' && qualityLevel !== 'low') { autoDowngrade(); return; }
-  setVolume(false, false); toast('התצוגה הנפחית כבדה למכשיר הזה, עברנו לתצוגה הקלה · אפשר לחזור אליה בכלים');
+  if (vol.thinner() && !volThinNote) { volThinNote = true; toast('המכשיר עמוס, התצוגה עברה לרזולוציה נמוכה יותר כדי לשמור על העננים מהסימולציה'); }
 }
 function setVolume(on, persist = true) {
   if (!vol) return;
-  vol.active = on; S.setOverlay(on); clouds.enabled = !on && tw.cloud > 0.01; volSlow = 0; volLast = 0;
+  vol.active = on; if (on) volT0 = performance.now(); S.setOverlay(on); clouds.enabled = !on && tw.cloud > 0.01; volSlow = 0; volLast = 0;
   $('volBtn')?.setAttribute('aria-pressed', String(on));
   if (field) { anchors = computeAnchors(field); cm1Anchors(); }
   if (persist) try { localStorage.setItem('lenticular.volume2', on ? '1' : '0'); } catch { /* private mode */ }  // only the visitor's own choice is remembered
@@ -805,7 +881,7 @@ async function startVolume() {
     vol = await createVolume($('stage'), { heights: wide, res: 1024, satURL: 'data/wide_sat_4096.webp', coreURL: 'data/core_sat_4096.webp', landURL: mobile ? null : 'data/wide_landcover_4096.webp', mobile, quality: qualityLevel });  // phones skip the land-cover tint to save GPU memory
     vol.setExag(state.exag);
     // the clouds come from the CM1 run in the GPU cloud (the evening of 19.11); the site's own linear model is the backup
-    try { await vol.fromCM1(120); vol.useCM1 = true; } catch (e) { console.warn('CM1 field unavailable, using the linear model', e); vol.useCM1 = false; if (field) vol.fromField(field); }
+    try { await vol.fromCM1(120); vol.useCM1 = true; await loadCM1Cut().catch((e) => console.warn('CM1 cut unavailable', e)); } catch (e) { console.warn('CM1 field unavailable, using the linear model', e); vol.useCM1 = false; if (field) vol.fromField(field); }
     $('cm1Btn')?.setAttribute('aria-pressed', String(vol.useCM1));
     setSunNow(tw.sun); setVolume(true); cm1Anchors();
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
@@ -845,9 +921,39 @@ const siteTour = initSiteTour({ button: $('siteTourBtn'), onDock: (d) => { setDo
   if (playing) setPlaying(false);
 } });
 $('tourChip').addEventListener('click', () => siteTour.start());
-if (!siteTour.seen && !startHash) setTimeout(() => { if (!$('about').open && !focus.isOn) siteTour.start(); }, 2200);
+if (!siteTour.seen && !startHash) setTimeout(() => { if ($('about').open || focus.isOn) return; if (mobile) offerTour(); else siteTour.start(); }, 2200);
+function offerTour() {  // a small card above the story: take the half-minute tour, or not
+  const box = document.createElement('div'); box.className = 'tour-offer chrome'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'הצעה לסיור');
+  box.innerHTML = '<p><b>פעם ראשונה כאן?</b> סיור קצר, חצי דקה, מראה איך משתמשים באתר.</p><div class="row"><button class="btn ghost" type="button" data-a="no">לא עכשיו</button><button class="btn primary" type="button" data-a="go">לסיור</button></div>';
+  const place = () => { const r = $('story').getBoundingClientRect(); box.style.bottom = `${innerHeight - r.top + 10}px`; };
+  const done = (go) => { box.remove(); removeEventListener('resize', place); if (go) siteTour.start(); else siteTour.close(); };
+  box.querySelector('[data-a=go]').onclick = () => done(true);
+  box.querySelector('[data-a=no]').onclick = () => done(false);
+  $('hint').classList.add('gone'); document.body.append(box); place(); addEventListener('resize', place);
+}
+// pull-to-refresh: a drag down that starts at the top edge reloads the page
+if (matchMedia('(pointer: coarse)').matches) {
+  const ind = document.createElement('div'); ind.className = 'ptr'; ind.setAttribute('aria-hidden', 'true');
+  ind.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v12M6 11l6 6 6-6"/></svg>'; document.body.append(ind);
+  const band = () => $('docks').getBoundingClientRect().top + 6;  // the header strip, above the drawers
+  let y0 = null, pull = 0;
+  // in the strip the drag belongs to the refresh, not to the camera
+  addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && e.clientY < band() && e.target === S.renderer.domElement) e.stopPropagation(); }, true);
+  addEventListener('touchstart', (e) => { y0 = e.touches.length === 1 && e.touches[0].clientY < band() && !document.body.classList.contains('touring') ? e.touches[0].clientY : null; pull = 0; }, { passive: true });
+  addEventListener('touchmove', (e) => {
+    if (y0 == null) return;
+    pull = Math.max(0, (e.touches[0].clientY - y0) * 0.55);
+    ind.style.transform = `translate(-50%, ${Math.min(pull, 90) - 50}px) rotate(${Math.min(pull, 70) / 70 * 180}deg)`;
+    ind.classList.toggle('on', pull > 8); ind.classList.toggle('ready', pull > 70);
+  }, { passive: true });
+  addEventListener('touchend', () => {
+    if (y0 == null) return; y0 = null;
+    if (pull > 70) { ind.classList.add('go'); setTimeout(() => location.reload(), 150); return; }
+    ind.classList.remove('on', 'ready'); ind.style.transform = '';
+  });
+}
 requestAnimationFrame(frame);
 startVolume();
 setTimeout(() => $('hint').classList.add('gone'), 9000);
 setTimeout(() => { $('loader').classList.add('done'); setTimeout(() => $('loader').remove(), 700); }, 400);
-window.__lent = { S, state, viz, curtain, clouds, get field() { return field; }, get anchors() { return anchors; }, go, setMode };
+window.__lent = { S, state, viz, curtain, clouds, get vol() { return vol; }, get field() { return field; }, get anchors() { return anchors; }, go, setMode };

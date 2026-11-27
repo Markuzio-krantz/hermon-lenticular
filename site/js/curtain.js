@@ -23,7 +23,23 @@ export function createCurtain(scene, groundAt) {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(L, ZT), mat); mesh.renderOrder = 3; mesh.visible = false; scene.add(mesh);
   let F = null, exag = 2, center = [10, 18.5], ang = 0, span = L;
   const S = { show: 0, amp: 0, gain: 2.5, reveal: 1 }, T = { ...S };
-  let drawnKey = '';
+  let drawnKey = '', sinceDraw = 0;
+  // the CM1 cut (GPU run): when set, the layer lines follow the simulated vertical wind and the white is its cloud water
+  let C = null;
+  function cutAt(x, n, z) { // -> { w m/s, q 0..1, under } at map km x, n and height z m
+    const m = C.meta, X = m.xz, nx = m.nx, sc = (x - C.sx) * C.ca + (n - C.sn) * C.sa;
+    const fi = (sc - m.s0_km) / m.dx_km, fk = (z / 1000 - X.z0_km) / X.dz_km;
+    if (fi < 0 || fi >= nx - 1 || fk < 0 || fk >= X.nz - 1) return { w: 0, q: 0, under: false };
+    const i = fi | 0, k = fk | 0, u = fi - i, v = fk - k, base = C.f * 2 * X.nz * nx, d = C.data;
+    const W = (kk, ii) => { const b = d[base + kk * nx + ii]; return b === 128 ? NaN : (b > 127 ? b - 256 : b) / 127 * X.wmax; };
+    const Q = (kk, ii) => d[base + X.nz * nx + kk * nx + ii] / 255;
+    const w00 = W(k, i), w10 = W(k, i + 1), w01 = W(k + 1, i), w11 = W(k + 1, i + 1);
+    if (Number.isNaN(w00) && Number.isNaN(w01)) return { w: 0, q: 0, under: true };
+    const z0 = (a) => (Number.isNaN(a) ? 0 : a);
+    const w = (z0(w00) * (1 - u) + z0(w10) * u) * (1 - v) + (z0(w01) * (1 - u) + z0(w11) * u) * v;
+    const q = (Q(k, i) * (1 - u) + Q(k, i + 1) * u) * (1 - v) + (Q(k + 1, i) * (1 - u) + Q(k + 1, i + 1) * u) * v;
+    return { w, q: q * q, under: false };  // stored sqrt-scaled
+  }
 
   function etaAt(o, x, n) {
     const N = F.inner, c = (x + 32) / 64 * N - 0.5, r = (32 - n) / 64 * N - 0.5;
@@ -71,6 +87,15 @@ export function createCurtain(scene, groundAt) {
       const moist = Math.min(1, Math.max(0, (rh - 55) / 30)), need = F.satLift[o];
       if (moist < 0.05 && z0 % 200) continue;            // dry air: every other layer is enough
       const pts = [];
+      if (C) { // follow the simulated air: lift grows with the CM1 vertical wind, dz = w / U ds
+        const Uk = Math.max(3, prof.U[k] * cos + prof.V[k] * sin); let eta = 0;
+        for (let s = -span / 2; s <= span / 2 + 1e-6; s += step) {
+          const x = center[0] + cos * s, n = center[1] + sin * s, c = cutAt(x, n, z0 + eta);
+          if (c.under) eta = 0; else eta = Math.max(-1500, Math.min(1500, eta + c.w / Uk * step * 1000));
+          const e = eta * S.amp, z = z0 + e * S.gain, gnd = groundAt(x, n), wet = c.q * S.amp > 0.02;
+          pts.push({ s, z, under: c.under || z < gnd + 40, wet, r: wet ? 1 + Math.min(1, c.q * 2.5) * 0.4 : need > 0 && isFinite(need) ? Math.max(0, e) / need : 0 });
+        }
+      } else
       for (let s = -span / 2; s <= span / 2 + 1e-6; s += step) {
         const x = center[0] + cos * s, n = center[1] + sin * s, e = etaAt(o, x, n) * S.amp;
         const z = z0 + e * S.gain, gnd = groundAt(x, n);
@@ -136,6 +161,8 @@ export function createCurtain(scene, groundAt) {
   return {
     S, T, mesh,
     set field(f) { F = f; drawnKey = ''; },
+    setCM1(c) { C = c; drawnKey = ''; },  // { meta, data, f (time index), sx, sn, ca, sa } or null
+    get cm1() { return !!C; },
     setExag(e) { exag = e; place(); },
     setPath(c, a, len = L) { center = c; ang = a; span = len; place(); drawnKey = ''; },
     target(t) { Object.assign(T, { show: 0, amp: 0, gain: 2.5, reveal: 1 }, t); if (t.restart) S.reveal = 0; },
@@ -149,8 +176,10 @@ export function createCurtain(scene, groundAt) {
       if (S.reveal < T.reveal) { S.reveal = Math.min(T.reveal, S.reveal + dt / 7); moving = true; } else S.reveal = T.reveal;
       mesh.visible = S.show > 0.01; mat.uniforms.opacity.value = S.show; mat.uniforms.reveal.value = S.reveal;
       if (mesh.visible) {
-        const key = `${S.amp.toFixed(3)}|${S.gain.toFixed(2)}`;
-        if (key !== drawnKey) { draw(); drawnKey = key; }
+        // the 2D canvas redraw and its upload are costly on the GPU: ~8 redraws a second while the wave eases, one at rest
+        const key = `${S.amp.toFixed(3)}|${S.gain.toFixed(2)}`, settled = S.amp === T.amp && S.gain === T.gain;
+        sinceDraw += dt;
+        if (key !== drawnKey && (settled || sinceDraw > 0.12 || !drawnKey)) { draw(); drawnKey = key; sinceDraw = 0; }
       }
       return moving;
     },
