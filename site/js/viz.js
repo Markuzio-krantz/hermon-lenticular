@@ -6,7 +6,7 @@
 //  divide  : the dividing streamline (air below goes around the Hermon)
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { streamline, gridAt } from './cm1cut.js';
+import { streamline, gridAt, CM1_GAIN } from './cm1cut.js';
 export const STACK_LEVELS = [1500, 2500, 3500, 4500, 5500, 6500];
 
 const STACK = STACK_LEVELS;
@@ -110,8 +110,8 @@ export function createViz(scene, groundAt) {
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), n = -p.getZ(i);
       if (D && li >= 0) {
-        const raw = gridAt(C, mode === 'moist' ? D.me : D.iso, li, x, n), e = (raw ?? 0) * S.amp;
-        p.setY(i, Math.max(z + e * S.gain, groundAt(x, n) + 40) / 1000 * exag);
+        const raw = gridAt(C, mode === 'moist' ? D.me : D.iso, li, x, n), e = Math.max(-900, Math.min(900, raw ?? 0)) * S.amp;
+        p.setY(i, Math.max(z + e * CM1_GAIN(S.gain), groundAt(x, n) + 40) / 1000 * exag);
         if (mode === 'moist') {
           const rh = raw === null ? 50 : gridAt(C, D.mr, li, x, n) / 2;
           if (rh >= 100) tmp.copy(cloud);

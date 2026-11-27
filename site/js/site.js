@@ -13,7 +13,7 @@ import { initLearn } from './learn.js';
 import { initSiteTour } from './sitetour.js';
 import { createFocus } from './focus.js';
 import { keyFor, TRY, swatch, RUNS, STEP_RUNS } from './key.js';
-import { parse3d, gridAt } from './cm1cut.js';
+import { parse3d, gridAt, CM1_GAIN } from './cm1cut.js';
 import { createThermal } from './thermal.js';
 import { fetchWindow, fetchDay, rowsAt, potential, POINT } from './openmeteo.js';
 
@@ -149,7 +149,7 @@ function cm1Wave(C) {
   let low = 1e9, ls = bs;
   for (let s = bs + 1; s <= bs + 12; s += 0.4) { const [x, n] = at(s, bc), e = gridAt(C, C.d3.iso, L, x, n); if (e !== null && e < low) { low = e; ls = s; } }
   const z = m.d3.iso_z[L] / 1000;
-  return { crest: [...at(bs, bc), z + best / 1000], trough: [...at(ls, bc), z + low / 1000] };
+  const g = CM1_GAIN(2.5); return { crest: [...at(bs, bc), z + best * g / 1000], trough: [...at(ls, bc), z + low * g / 1000], lift: Math.round(best / 10) * 10 };
 }
 // where the cut's own cloud starts and ends: the labels "enters / leaves the cloud" point there
 function cm1CutAnchors(F) {
@@ -987,6 +987,7 @@ async function startVolume() {
     try { await vol.fromCM1(120); vol.useCM1 = true; await loadCM1Cut().catch((e) => console.warn('CM1 cut unavailable', e)); } catch (e) { console.warn('CM1 field unavailable, using the linear model', e); vol.useCM1 = false; if (field) vol.fromField(field); }
     $('cm1Btn')?.setAttribute('aria-pressed', String(vol.useCM1));
     setSunNow(tw.sun); setVolume(true); cm1Anchors();
+    if (state.mode !== 'lab' && STEPS[step]) renderTry(STEPS[step]);  // a direct link to a step drew the try box before the CM1 runs were ready
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
 }
 $('volBtn')?.addEventListener('click', () => { if (!vol) return startVolume(); setVolume(!vol.active); });

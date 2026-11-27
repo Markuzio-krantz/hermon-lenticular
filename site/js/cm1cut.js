@@ -22,8 +22,37 @@ export function cutAt(C, x, n, z) {
 export function parse3d(meta, buf) {
   const n = meta.nx * meta.ny, b = new Uint8Array(buf);
   const i16 = (off, count) => new Int16Array(b.slice(off, off + count * 2).buffer);
-  return { n, iso: i16(0, 6 * n), me: i16(12 * n, 2 * n), mr: b.slice(16 * n, 18 * n), ul: new Int8Array(b.slice(18 * n, 19 * n).buffer) };
+  const sm = (a, L) => smooth(a, L, meta.nx, meta.ny);
+  return { n, iso: sm(i16(0, 6 * n), 6), me: sm(i16(12 * n, 2 * n), 2), mr: b.slice(16 * n, 18 * n), ul: new Int8Array(b.slice(18 * n, 19 * n).buffer) };
 }
+
+/**
+ * The raw surfaces carry the 400 m grid's turbulence and terrain-hugging spikes; drawn exaggerated they become walls.
+ * Two passes of a 5x5 box blur (about 1 km) per layer keep the wave (wavelength ~10 km) and drop the noise.
+ */
+function smooth(src, layers, nx, ny, r = 2, passes = 2) {
+  let a = Float32Array.from(src);
+  const t = new Float32Array(a.length);
+  for (let p = 0; p < passes; p++) {
+    for (let L = 0; L < layers; L++) {
+      const o = L * nx * ny;
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        let s = 0, c = 0;
+        for (let d = -r; d <= r; d++) { const ii = i + d; if (ii >= 0 && ii < nx) { s += a[o + j * nx + ii]; c++; } }
+        t[o + j * nx + i] = s / c;
+      }
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        let s = 0, c = 0;
+        for (let d = -r; d <= r; d++) { const jj = j + d; if (jj >= 0 && jj < ny) { s += t[o + jj * nx + i]; c++; } }
+        a[o + j * nx + i] = s / c;
+      }
+    }
+  }
+  return a;
+}
+
+/** CM1 surfaces are real heights, already large (up to ~700 m at 4.5 km): exaggerate them far less than the quick model */
+export const CM1_GAIN = (g) => 1 + (g - 1) * 0.2;
 
 /** bilinear sample of one layer of a [layer][NY][NX] grid at map km x, n; null outside the CM1 box */
 export function gridAt(C, arr, layer, x, n) {
