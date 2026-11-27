@@ -12,6 +12,8 @@ import { initLab, startTour } from './lab.js';
 import { initLearn } from './learn.js';
 import { initSiteTour } from './sitetour.js';
 import { createFocus } from './focus.js';
+import { keyFor, TRY, swatch } from './key.js';
+import { createThermal } from './thermal.js';
 import { fetchWindow, fetchDay, rowsAt, potential, POINT } from './openmeteo.js';
 
 const $ = (id) => document.getElementById(id);
@@ -115,8 +117,8 @@ let anchors = {}, focusRef = null;
 let cm1Cut = null;
 function curtainPath(c, a) {
   const F = cm1Cut && vol?.active && vol.useCM1 ? vol.cm1Frame : null;
-  if (F) { curtain.setPath([F.sx - F.ca * 3, F.sn - F.sa * 3], Math.atan2(F.sa, F.ca)); curtain.setCM1({ ...cm1Cut, ...F }); }
-  else { curtain.setPath([c[0] - Math.cos(a) * 3, c[1] - Math.sin(a) * 3], a); curtain.setCM1(null); }
+  if (F) { const C = { ...cm1Cut, ...F }; curtain.setPath([F.sx - F.ca * 3, F.sn - F.sa * 3], Math.atan2(F.sa, F.ca)); curtain.setCM1(C); viz.setJourney([F.sx, F.sn], Math.atan2(F.sa, F.ca)); viz.setCM1(C); }
+  else { curtain.setPath([c[0] - Math.cos(a) * 3, c[1] - Math.sin(a) * 3], a); curtain.setCM1(null); viz.setCM1(null); }
 }
 async function loadCM1Cut() {
   const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_xz.bin').then((r) => r.arrayBuffer())]);
@@ -182,7 +184,7 @@ function computeAnchors(r) {
   return A;
 }
 const CALLOUT_TEXT = {
-  lens: 'עדשות · 3.9 ק"מ', box: 'תחום החישוב · 64×64 ק"מ', upstream: 'רוח מערבית', crest: 'פסגת הגל', trough: 'שקע הגל',
+  lit: 'העדשה מעל הגבול: עדיין מוארת', lens: 'עדשות · 3.9 ק"מ', box: 'תחום החישוב · 64×64 ק"מ', upstream: 'רוח מערבית', crest: 'פסגת הגל', trough: 'שקע הגל',
   moistLayer: 'שכבה לחה · 82%', birth: 'כאן האוויר מגיע לרוויה', enter: 'נכנס לענן: מתעבה', exit: 'יוצא: מתאדה',
   shadow: 'העמק כבר בצל', layer1: 'שכבה לחה · 82%', gap: 'שכבה יבשה · 50%', layer2: 'שכבה לחה · 64%', train: 'רכבת עדשות', cap: 'ענן כובע', lensHi: 'עדשה', rotor: 'רוטור',
 };
@@ -204,7 +206,7 @@ function setSunNow(e) {
   const t = THREE.MathUtils.clamp((e + 4) / 12, 0, 1);
   u.uAmbTop.value.setRGB(0.14 + 0.28 * t, 0.15 + 0.32 * t, 0.26 + 0.4 * t);
   u.uAmbBot.value.setRGB(0.11 + 0.18 * t, 0.1 + 0.16 * t, 0.15 + 0.2 * t);
-  viz.setShadowKm(sun.shadowKm);
+  viz.setShadowKm(sun.shadowKm); if (anchors) lightNote(sun.shadowKm);
 }
 function setView(v, ms = 2200) {
   if (v === 'curtain') {
@@ -304,7 +306,69 @@ const LEGEND = {
   family: [['#ff5a4e', 'רוטור: הרוח ליד הקרקע מתהפכת']],
 };
 LEGEND.birth = LEGEND.curtain; LEGEND.moist = LEGEND.curtain;
-function legend(id) { const L = LEGEND[id], html = L ? L.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('') : ''; $('legend').innerHTML = html; $('legendInline').innerHTML = html; }
+function legend(id) {  // the step's key lives in the story card: tap an item to read what it means and see it blink
+  $('legend').innerHTML = '';
+  const K = keyFor(id), chips = $('keyChips'); $('key').hidden = !K.length; $('keyInfo').hidden = true;
+  chips.innerHTML = K.map((k, i) => `<button type="button" class="key-chip" data-i="${i}" aria-pressed="false">${swatch(k.sw)}<span>${k.name}</span></button>`).join('');
+  chips.onclick = (e) => {
+    const b = e.target.closest('.key-chip'); if (!b) return; const k = K[+b.dataset.i], on = b.getAttribute('aria-pressed') !== 'true';
+    for (const x of chips.children) x.setAttribute('aria-pressed', String(x === b && on));
+    const info = $('keyInfo'); info.hidden = !on; info.textContent = on ? k.text : '';
+    if (on) { blink(k.blink); requestAnimationFrame(() => info.scrollIntoView({ block: 'nearest', behavior: 'smooth' })); }  // the card may scroll on phones
+  };
+}
+// make one thing on the map blink twice, so the eye finds it
+let blinkT = 0;
+function blink(k) {
+  if (!k) return;
+  const acc = {
+    clouds: [() => tw.cloud, (v) => { tw.cloud = tw.cloudT = v; }],
+    curtain: [() => curtain.S.show, (v) => { curtain.S.show = curtain.T.show = v; }],
+    stack: [() => viz.S.stack, (v) => { viz.S.stack = viz.T.stack = v; }],
+    moist: [() => viz.S.moist, (v) => { viz.S.moist = viz.T.moist = v; }],
+    journey: [() => viz.S.journey, (v) => { viz.S.journey = viz.T.journey = v; }],
+    shadow: [() => viz.S.shadow, (v) => { viz.S.shadow = viz.T.shadow = v; }],
+  }[k];
+  clearInterval(blinkT); let n = 0;
+  if (acc) {
+    const [get, set] = acc, v0 = get() > 0.05 ? get() : 1;
+    blinkT = setInterval(() => { set(n % 2 ? v0 : 0); S.invalidate(); if (++n > 4) { clearInterval(blinkT); set(v0); S.invalidate(); } }, 230);
+  } else {  // flow, wind arrows, rotors, names: switch the layer off and on
+    blinkT = setInterval(() => { state.layers[k] = n % 2 === 1; applyVisuals(); layerTargets(); S.invalidate(); if (++n > 4) { clearInterval(blinkT); state.layers[k] = true; applyVisuals(); layerTargets(); syncLayers(); } }, 230);
+  }
+}
+// ---------- "try it": one cause per step; model parameters show the quick model, which answers at once
+let tryState = null, thermal = null;
+function renderTry(s) {
+  const box = $('tryBox'), body = $('tryBody'), T = TRY[s.id];
+  thermal?.stop(); thermal = null;
+  if (s.id === 'thermal') {
+    box.hidden = false; box.open = true; body.innerHTML = '<div class="th"></div>';
+    thermal = createThermal(body.firstChild, { getProf: () => field?.prof }); thermal.start(); return;
+  }
+  box.hidden = !T; box.open = !!s.tryOpen; if (!T) { body.innerHTML = ''; return; }
+  const val = T.v === 'sun' ? tw.sunT : state.params[T.p], dec = T.step < 1 ? (T.step < 0.1 ? 2 : 1) : 0;
+  body.innerHTML = `<label class="try-row"><span>${T.label}</span><input type="range" min="${T.min}" max="${T.max}" step="${T.step}" value="${val}"><output>${(+val).toFixed(dec)}</output></label>
+    <p class="try-look">${T.look}</p><p class="try-model" hidden>מוצג עכשיו <b>המודל המהיר</b>: הוא מגיב מיד לכל שינוי. CM1 הוא ריצה אחת של אותו ערב, ואי אפשר לשנות אותה בזמן אמת. <button type="button" class="chip" data-a="back">חזרה ל-CM1</button></p>`;
+  const inp = body.querySelector('input'), o = body.querySelector('output');
+  inp.oninput = () => {
+    const v = +inp.value; o.textContent = v.toFixed(dec);
+    if (T.v === 'sun') { tw.loop = null; tw.sunT = v; return; }
+    if (!tryState) { tryState = { preset: state.preset, cm1: !!vol?.useCM1 }; if (vol?.useCM1) setCM1(false, true); }
+    body.querySelector('.try-model').hidden = !tryState.cm1;
+    state.params[T.p] = v; state.preset = null; lab.sync(); compute();
+  };
+  body.querySelector('[data-a=back]').onclick = () => { endTry(); renderTry(STEPS[step]); };
+}
+function endTry() {
+  if (!tryState) return; const t = tryState; tryState = null;
+  lab.setPreset(t.preset || 'sunset', false); compute(); if (t.cm1) setCM1(true, true);
+}
+// light step: say whether the lens itself is still lit
+function lightNote(km) {
+  const t = km < 4 ? 'העדשה מעל הגבול: עדיין מוארת' : km < 5.15 ? 'רק ראש העדשה עוד מואר' : 'גם העדשה בצל: הוורוד כבה';
+  if (t !== CALLOUT_TEXT.lit) { CALLOUT_TEXT.lit = t; if (calloutIds.includes('lit') && anchors) applyCallouts(); }
+}
 
 
 // ---------- original photos beside the map
@@ -389,7 +453,7 @@ new MutationObserver(() => { if (!$('layerPanel').hidden) setTimeout(() => $('la
 
 
 // ---------- learn: topics beside the lab
-const STEP_TOPIC = { scene: 'shadow', map: 'model', wind: 'wave', layers: 'stability', wave: 'wave', moist: 'saturation', birth: 'saturation', through: 'ice', light: 'shadow', train: 'scorer', family: 'family', lab: 'model' };
+const STEP_TOPIC = { thermal: 'stability', scene: 'shadow', map: 'model', wind: 'wave', layers: 'stability', wave: 'wave', moist: 'saturation', birth: 'saturation', through: 'ice', light: 'shadow', train: 'scorer', family: 'family', lab: 'model' };
 const TOPIC_NAME = { stability: 'יציבות', wave: 'גל עומד', saturation: 'רוויה ונקודת טל', froude: 'חסימה', scorer: 'לכידת גלים', shadow: 'צל כדור הארץ', ice: 'טיפות וקרח', family: 'משפחת העננים', model: 'איך זה מחושב' };
 const learn = initLearn($('learn'), (tr) => {
   if (state.mode !== 'lab') setMode('lab');
@@ -422,6 +486,7 @@ STEPS.forEach((s, i) => {
   li.appendChild(b); segs.appendChild(li);
 });
 function go(i) {
+  endTry();
   step = Math.max(0, Math.min(STEPS.length - 1, i)); stepT0 = performance.now();
   const s = STEPS[step];
   $('stepNo').textContent = `שלב ${step + 1} מתוך ${STEPS.length}`;
@@ -443,7 +508,7 @@ function go(i) {
   stepBase = { stack: s.viz.stack, moist: s.viz.moist, curtain: s.curtain?.show, clouds: s.clouds, ampSet: true };
   S.labels.focus(s.focus || null);
   calloutIds = s.callouts || []; applyCallouts();
-  legend(s.id);
+  legend(s.id); renderTry(s);
   $('photoBtn').hidden = !s.photo; showPhoto(false);
   $('studioCta').hidden = !['wave', 'moist', 'birth', 'through'].includes(s.id);
   setHash(`s${step + 1}`);
@@ -720,7 +785,7 @@ function keepCallouts() {
 // place names: hide the ones under a panel or under a story callout
 function declutter() {
   const block = chromeRects();
-  for (const c of document.querySelectorAll('.callout span')) { const r = c.getBoundingClientRect(); if (r.width) block.push(r); }
+  for (const c of document.querySelectorAll('.callout span, .sheet-tag')) { const r = c.getBoundingClientRect(); if (r.width) block.push(r); }
   for (const el of document.querySelectorAll('.pl')) {
     if (el.classList.contains('off') || el.style.display === 'none') { el.classList.remove('covered'); continue; }
     const r = el.getBoundingClientRect(), cov = !!r.width && (r.left < 4 || r.right > innerWidth - 4 || block.some((b) => hits(r, b)));  // cut by the screen edge counts as covered
@@ -850,6 +915,7 @@ function cm1Anchors() {
   const pk = on ? vol.cm1Peak : null, hadAim = !!S._aimOn;
   S.setAim(pk ? [pk[0], pk[2], -pk[1]] : null); S._aimOn = !!pk;
   if (!!pk !== hadAim && state.mode === 'story') setView(STEPS[step].view, 1400);  // re-frame once the lens is known
+  if (anchors) anchors.lit = on ? vol.cm1Peak : anchors.lens;
   if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; const cut = cm1Cut && vol.cm1Frame ? cm1CutAnchors(vol.cm1Frame) : null; if (cut) Object.assign(anchors, cut); }
   geometry();
   if (anchors) applyCallouts();
@@ -887,12 +953,13 @@ async function startVolume() {
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
 }
 $('volBtn')?.addEventListener('click', () => { if (!vol) return startVolume(); setVolume(!vol.active); });
-$('cm1Btn')?.addEventListener('click', async () => {
+async function setCM1(on, quiet = false) {
   if (!vol) return;
-  vol.useCM1 = !vol.useCM1; $('cm1Btn').setAttribute('aria-pressed', String(vol.useCM1));
-  if (vol.useCM1) { await vol.fromCM1(120); toast('העננים מסימולציית הענן (CM1) של ערב 19.11'); } else { if (field) vol.fromField(field); toast('מודל הגיבוי: המודל הלינארי, מגיב למחוונים'); }
+  vol.useCM1 = on; $('cm1Btn').setAttribute('aria-pressed', String(on));
+  if (on) { await vol.fromCM1(120); if (!quiet) toast('העננים מסימולציית הענן (CM1) של ערב 19.11'); } else { if (field) vol.fromField(field); if (!quiet) toast('מודל הגיבוי: המודל הלינארי, מגיב למחוונים'); }
   if (field) anchors = computeAnchors(field); cm1Anchors();
-});
+}
+$('cm1Btn')?.addEventListener('click', () => { if (vol) { tryState = null; setCM1(!vol.useCM1); } });
 
 // ---------- start
 const startHash = location.hash;

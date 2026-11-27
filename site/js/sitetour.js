@@ -5,7 +5,7 @@ const KEY = 'lenticular.tour';
 // show: the chrome block to bring back; sel: what to ring; dock/menu: open it for this step
 const STEPS = [
   { title: 'ענן שעומד במקום, אוויר שזז', text: 'סיור של חצי דקה. בכל שלב יופיע רק הדבר שמדובר עליו. אפשר לדלג בכל רגע.' },
-  { show: '#story', sel: '.step-nav', title: 'הסיפור: שלב אחר שלב', text: 'הסיפור בנוי מ-12 שלבים. "הבא" ו"הקודם" כאן, או החצים במקלדת. אפשר גם להחליק על המפה בלי לקרוא.' },
+  { show: '#story', sel: '.step-nav', title: 'הסיפור: שלב אחר שלב', text: 'הסיפור בנוי מ-13 שלבים. "הבא" ו"הקודם" כאן, או החצים במקלדת. אפשר גם להחליק על המפה בלי לקרוא.' },
   { show: '#story', sel: '#storyMin', title: 'להסתיר את ההסבר', text: 'החץ הזה מקפל את חלון ההסבר לפס דק עם חצים, והמפה מקבלת את כל המסך. לחיצה נוספת פותחת אותו.' },
   { show: '#docks', sel: '#layersDock', dock: 'layersPanel', title: 'שכבות', text: 'מה מוצג על המפה: עננים, זרימת אוויר, שכבות לחות ועוד. החץ פותח וסוגר, ונגיעה במפה מקפלת הכול.' },
   { show: '#docks', sel: '#toolsDock', dock: 'toolsPanel', title: 'כלים', text: 'נקודות מבט, זום, איכות התצוגה, קישור למה שמוצג, ו"רק מפה" שמסתיר את כל הכפתורים (גם מקש H).' },

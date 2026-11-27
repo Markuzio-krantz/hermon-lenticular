@@ -14,8 +14,9 @@
   header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
   header h1 { margin: 0; font-size: clamp(1.2rem, 3.6vw, 1.7rem); font-weight: 700; }
   header a { margin-inline-start: auto; color: var(--ink-2); font-size: .9rem; }
-  main { display: grid; grid-template-columns: 1fr 320px; gap: 14px; padding: 0 16px 16px; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  main { display: grid; grid-template-columns: 1fr 320px; grid-template-rows: auto 1fr; gap: 14px; padding: 0 16px 16px; align-items: start; }
+  .stage { grid-column: 1; grid-row: 1; } main > aside { grid-column: 2; grid-row: 1 / span 2; } main > .words { grid-column: 1; grid-row: 2; padding: 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } .stage, main > aside, main > .words { grid-column: 1; grid-row: auto; } main > .words { order: 3; } }
   .stage { position: relative; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 30px rgb(80 60 20 / .15); background: #9ecbff; min-height: 300px; aspect-ratio: 16 / 9; }
   canvas { display: block; width: 100%; height: 100%; }
   .bubble { position: absolute; inset-inline-start: 14px; top: 14px; max-width: min(420px, 75%); display: flex; gap: 10px; align-items: flex-start; }
@@ -23,7 +24,7 @@
   @keyframes bob { 50% { transform: translateY(-4px) scale(1.04, .97); } }
   @media (prefers-reduced-motion: reduce) { .bubble .who { animation: none; } }
   .bubble p { margin: 0; padding: 10px 14px; border-radius: 16px; background: #fff; font-size: 1rem; line-height: 1.45; box-shadow: 0 4px 14px rgb(0 0 0 / .12); }
-  .found { position: absolute; inset-inline-end: 14px; bottom: 14px; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / .9); font-weight: 500; font-size: 1rem; }
+  .found { position: absolute; inset-inline-end: 44px; top: 14px; z-index: 2; padding: 8px 14px; border-radius: 999px; background: rgb(255 255 255 / .9); font-weight: 500; font-size: 1rem; }
   aside { display: grid; gap: 12px; align-content: start; }
   .card { background: var(--card); border: 2px solid var(--line); border-radius: 20px; padding: 14px; }
   .card h2 { margin: 0 0 10px; font-size: 1.05rem; }
@@ -45,6 +46,7 @@
   .score { font-size: .95rem; color: var(--ink-2); }
   .hero { display: grid; gap: 10px; background: linear-gradient(135deg, #fff4e0, #ffe4f0); }
   button.big { font-size: 1.05rem; padding: 14px 16px; background: var(--accent); }
+  .guide[hidden], .found:empty { display: none; }
   .guide { position: absolute; inset-inline: 14px; bottom: 14px; max-width: 460px; margin-inline-end: auto; padding: 12px 14px; border-radius: 18px; background: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / .18); display: grid; gap: 8px; animation: pop .35s ease both; }
   @keyframes pop { from { transform: translateY(10px) scale(.97); opacity: 0; } }
   .guide .gh { display: flex; align-items: center; gap: 8px; }
@@ -70,6 +72,8 @@
   .wordbox b { font-size: 1.1rem; } .wordbox p { margin: 4px 0 0; font-size: 1rem; line-height: 1.5; }
   .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
   :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  /* phones: the picture keeps the screen width, and the guide sits under it instead of covering it */
+  @media (max-width: 860px) { .stage { aspect-ratio: auto; min-height: 0; } #sky { aspect-ratio: 4 / 3; height: auto; } .guide { position: relative; inset: auto; margin: 8px; max-width: none; box-shadow: none; } }
 </style>
 </head>
 <body>
@@ -108,20 +112,21 @@
       <div class="row" style="margin-top:10px"><button class="ghost" id="reset" type="button">להתחיל מחדש</button></div>
     </div>
   </aside>
+  <section class="words" aria-label="מילון בתמונות">
+    <h2>מילון בתמונות <small>לחצו על מילה</small></h2>
+    <div class="wl">
+      <button type="button" data-w="hum"><span class="ic hum" aria-hidden="true">💧</span>לחות</button>
+      <button type="button" data-w="temp"><span class="ic temp" aria-hidden="true">🌡️</span>טמפרטורה</button>
+      <button type="button" data-w="dew"><span class="ic dew" aria-hidden="true">🥛</span>נקודת הטל</button>
+      <button type="button" data-w="spring"><span class="ic spring" aria-hidden="true">🪀</span>אוויר קפיצי</button>
+      <button type="button" data-w="wave"><span class="ic wave" aria-hidden="true">〰️</span>גל</button>
+      <button type="button" data-w="cond"><span class="ic cond" aria-hidden="true">☁️</span>התעבות</button>
+      <button type="button" data-w="wind"><span class="ic wind" aria-hidden="true">🌬️</span>רוח</button>
+    </div>
+    <div class="wordbox" id="wordBox" hidden><b id="wordT"></b><p id="wordX"></p></div>
+  </section>
 </main>
-<section class="words" aria-label="מילון בתמונות">
-  <h2>מילון בתמונות <small>לחצו על מילה</small></h2>
-  <div class="wl">
-    <button type="button" data-w="hum"><span class="ic hum" aria-hidden="true">💧</span>לחות</button>
-    <button type="button" data-w="temp"><span class="ic temp" aria-hidden="true">🌡️</span>טמפרטורה</button>
-    <button type="button" data-w="dew"><span class="ic dew" aria-hidden="true">🥛</span>נקודת הטל</button>
-    <button type="button" data-w="spring"><span class="ic spring" aria-hidden="true">🪀</span>אוויר קפיצי</button>
-    <button type="button" data-w="wave"><span class="ic wave" aria-hidden="true">〰️</span>גל</button>
-    <button type="button" data-w="cond"><span class="ic cond" aria-hidden="true">☁️</span>התעבות</button>
-    <button type="button" data-w="wind"><span class="ic wind" aria-hidden="true">🌬️</span>רוח</button>
-  </div>
-  <div class="wordbox" id="wordBox" hidden><b id="wordT"></b><p id="wordX"></p></div>
-</section>
+
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 <script type="module" src="js/kids.js"></script>
 </body>

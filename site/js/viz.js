@@ -6,6 +6,7 @@
 //  divide  : the dividing streamline (air below goes around the Hermon)
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { streamline } from './cm1cut.js';
 export const STACK_LEVELS = [1500, 2500, 3500, 4500, 5500, 6500];
 
 const STACK = STACK_LEVELS;
@@ -56,6 +57,15 @@ export function createViz(scene, groundAt) {
   const halo = new THREE.Mesh(new THREE.SphereGeometry(1.5, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
   group.add(path, parcel, halo);
   let jS = -30, jAng = 0, jC = [12.8, 18.5];
+  // with the CM1 cut set, the parcel rides a simulated streamline: the level whose air passes through the cut's cloud
+  let C = null, jLine = null, jZ0 = 3800;
+  function pickLevel() {
+    let best = -1; jZ0 = 4200;
+    for (let z = 3400; z <= 4800; z += 100) {
+      const L = streamline(C, F.prof, z, jC[0], jC[1], Math.cos(jAng), Math.sin(jAng), -30, 30, 0.5);
+      const q = L.reduce((a, p) => a + p.q, 0); if (q > best) { best = q; jZ0 = z; }
+    }
+  }
 
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(128, 128), new THREE.MeshBasicMaterial({ color: 0x1a1030, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; group.add(shadow);
@@ -113,6 +123,15 @@ export function createViz(scene, groundAt) {
   }
   function shapeJourney() {
     const p = pathGeo.attributes.position, col = pathGeo.attributes.color, o = lvl(3800), need = F.satLift[o];
+    if (C) {
+      jLine = streamline(C, F.prof, jZ0, jC[0], jC[1], Math.cos(jAng), Math.sin(jAng), -30, 30, 60 / (NP - 1));
+      for (let k = 0; k < NP; k++) {
+        const q = jLine[k], x = jC[0] + Math.cos(jAng) * q.s, n = jC[1] + Math.sin(jAng) * q.s, up = k ? q.eta - jLine[k - 1].eta : 0;
+        p.setXYZ(k, x, (jZ0 + q.eta * S.amp * S.gain) / 1000 * exag, -n);
+        tmp.copy(q.q > 0.02 ? cloud : up < -0.5 ? dry : wet); col.setXYZ(k, tmp.r, tmp.g, tmp.b);
+      }
+      p.needsUpdate = true; col.needsUpdate = true; return;
+    }
     for (let k = 0; k < NP; k++) {
       const s = -30 + 60 * k / (NP - 1), x = jC[0] + Math.cos(jAng) * s, n = jC[1] + Math.sin(jAng) * s;
       const e = etaAt(o, x, n) * S.amp;
@@ -126,9 +145,11 @@ export function createViz(scene, groundAt) {
   let shapedAmp = -1, shapedExag = -1;
   return {
     S, T, group,
-    set field(f) { F = f; shapedAmp = -1; },
+    set field(f) { F = f; shapedAmp = -1; if (C) pickLevel(); },
     setExag(e) { exag = e; shapedExag = -1; },
-    setJourney(center, ang) { jC = center; jAng = ang; shapedAmp = -1; },
+    setJourney(center, ang) { jC = center; jAng = ang; shapedAmp = -1; if (C && F) pickLevel(); },
+    setCM1(c) { C = c; jLine = null; shapedAmp = -1; if (C && F) pickLevel(); },
+    get journeyKm() { return C ? jZ0 / 1000 : 3.8; },
     setShadowKm(km) { shadowKm = km; },
     setDivideKm(km) { divideKm = km; },
     setCallouts,
@@ -157,10 +178,19 @@ export function createViz(scene, groundAt) {
       if (path.visible) {
         if (reshape) shapeJourney();
         jS += dt * 3.2 * speed; if (jS > 30) jS = -30;
-        const o = lvl(3800), x = jC[0] + Math.cos(jAng) * jS, n = jC[1] + Math.sin(jAng) * jS, e = etaAt(o, x, n) * S.amp;
-        parcel.position.set(x, (3800 + e * S.gain) / 1000 * exag, -n); halo.position.copy(parcel.position);
-        const inCloud = e > F.satLift[o];
-        parcel.material.color.set(inCloud ? 0xffffff : e < 0 ? 0xe0b062 : 0x6fb2ff);
+        const x = jC[0] + Math.cos(jAng) * jS, n = jC[1] + Math.sin(jAng) * jS;
+        let inCloud, col;
+        if (C && jLine) {  // CM1: position and colour straight from the simulated streamline
+          const fk = Math.max(0, Math.min(NP - 1.001, (jS + 30) / 60 * (NP - 1))), k = fk | 0, u = fk - k, a = jLine[k], b = jLine[k + 1];
+          const eta = a.eta + (b.eta - a.eta) * u; inCloud = a.q + (b.q - a.q) * u > 0.02;
+          parcel.position.set(x, (jZ0 + eta * S.amp * S.gain) / 1000 * exag, -n);
+          col = inCloud ? 0xffffff : b.eta < a.eta - 0.5 ? 0xe0b062 : 0x6fb2ff;
+        } else {
+          const o = lvl(3800), e = etaAt(o, x, n) * S.amp;
+          parcel.position.set(x, (3800 + e * S.gain) / 1000 * exag, -n);
+          inCloud = e > F.satLift[o]; col = inCloud ? 0xffffff : e < 0 ? 0xe0b062 : 0x6fb2ff;
+        }
+        halo.position.copy(parcel.position); parcel.material.color.set(col);
         parcel.material.opacity = S.journey; halo.material.opacity = (inCloud ? 0.35 : 0.12) * S.journey;
         moving = true;
       }

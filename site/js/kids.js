@@ -178,7 +178,9 @@ function frame(t) {
   for (const p of parts) {
     p.x += v * dt * 6; if (p.x > X1) { p.x = X0; p.trail.length = 0; }
     const e = eta(p.x, p.z0, W), z = p.z0 + e; if (z < ground(p.x)) { p.trail.length = 0; continue; }
-    const X = sx(p.x), Y = sz(z); p.trail.push(X, Y); if (p.trail.length > 12) p.trail.splice(0, 2);
+    const X = sx(p.x), Y = sz(z);
+    if (p.trail.length && Math.hypot(X - p.trail[p.trail.length - 2], Y - p.trail[p.trail.length - 1]) > 30 * dpr) p.trail.length = 0;  // resized or jumped: start a fresh trail
+    p.trail.push(X, Y); if (p.trail.length > 12) p.trail.splice(0, 2);
     const wet = rhAt(p.z0) >= 40, inCloud = wet && e > needKm(p.z0);
     const col = inCloud ? '255,255,255' : wet ? '59,130,246' : '224,160,80';
     cx.strokeStyle = `rgba(${col},.45)`; cx.lineWidth = 2 * dpr; cx.beginPath(); cx.moveTo(p.trail[0], p.trail[1]);
@@ -198,12 +200,14 @@ function frame(t) {
   }
   if (P.hill > 1.6) {
     cx.fillStyle = '#ffffff'; cx.beginPath();
-    for (let i = 0; i <= 30; i++) { const x = -2.2 + (i / 30) * 4.4; const z = ground(x); i ? cx.lineTo(sx(x), sz(z)) : cx.moveTo(sx(x), sz(z)); }
-    cx.lineTo(sx(2.2), sz(ground(2.2) - 0.25)); cx.lineTo(sx(-2.2), sz(ground(-2.2) - 0.25)); cx.fill();
+    const half = 2.2, depth = Math.min(0.5, (P.hill - 1.6) * 0.45 + 0.15);  // snow cap: thickest on the summit, thinning down both slopes
+    for (let i = 0; i <= 40; i++) { const x = -half + (i / 40) * 2 * half; i ? cx.lineTo(sx(x), sz(ground(x))) : cx.moveTo(sx(x), sz(ground(x))); }
+    for (let i = 40; i >= 0; i--) { const x = -half + (i / 40) * 2 * half, k = 1 - (x / half) ** 2; cx.lineTo(sx(x), sz(ground(x) - depth * k)); }
+    cx.closePath(); cx.fill();
   }
   drawScales(); drawCues(t); drawFollow(t, dt);
   cx.fillStyle = 'rgba(255,255,255,.92)'; cx.font = `500 ${14 * dpr}px Rubik, sans-serif`; cx.textAlign = 'left';
-  cx.fillText(P.wind < 1 ? 'אין רוח' : `רוח ← ${P.wind} מ'/ש`, 12 * dpr, Hpx - 14 * dpr);
+  cx.fillText(P.wind < 1 ? 'אין רוח' : `רוח ← ${P.wind} מ'/ש`, 52 * dpr, Hpx - 14 * dpr);  // clear of the thermometer
 }
 
 // ---------------- follow one bubble of air: it cools as it rises, and at 100% it becomes droplets
@@ -243,7 +247,7 @@ function drawScales() {
   cx.fillStyle = 'rgba(255,255,255,.7)'; rr(x - 3 * dpr, top - 4 * dpr, w + 6 * dpr, bot - top + 8 * dpr, 8 * dpr); cx.fill();
   cx.fillStyle = g; rr(x, top, w, bot - top, 5 * dpr); cx.fill();
   cx.fillStyle = '#1f2340'; cx.font = `500 ${11 * dpr}px Rubik, sans-serif`; cx.textAlign = 'left'; cx.direction = 'ltr';
-  for (const z of [0, 2, 4, 6, 8]) cx.fillText(`${Math.round(15 - 6.5 * z)}°`, x + w + 5 * dpr, sz(z) + 4 * dpr);
+  for (const z of [1, 3, 5, 7]) cx.fillText(`${Math.round(15 - 6.5 * z)}°`, x + w + 5 * dpr, sz(z) + 4 * dpr);
   cx.direction = 'rtl'; cx.textAlign = 'right';
   // humidity you can see: droplets in the moist layers, more of them when it is wetter
   const bands = [[0.8, 1.8, P.low], [3.3, 3.7, P.up], [3.9, 4.2, P.up - 4], [4.4, 4.65, P.up - 8]];
@@ -333,6 +337,8 @@ const MISSIONS = [
   ['rotor', 'רוח חזקה + אוויר קפיצי: צרו ענן רוטור'],
   ['clear', 'העלימו את כל העננים'],
 ];
+// a mission counts only after the child has moved something
+let touched = false; document.addEventListener('input', () => { touched = true; }, true); document.addEventListener('click', (e) => { if (e.target.closest?.('#guideBtn, #gNext, #jet')) touched = true; }, true);
 let done = {}; try { done = JSON.parse(localStorage.getItem('kids.done') || '{}'); } catch { done = {}; }
 function drawMissions() {
   $('missions').innerHTML = MISSIONS.map(([k, t]) => `<li class="${done[k] ? 'done' : ''}"><span class="st" aria-hidden="true">⭐</span><span>${t}</span></li>`).join('');
@@ -355,7 +361,7 @@ function report() {
   const list = Object.keys(NAMES).filter((k) => found[k] && !(k === 'lens' && found.train));
   $('found').textContent = list.length ? list.map((k) => NAMES[k]).join(' · ') : 'עוד אין ענן';
   $('tip').textContent = tipFor();
-  for (const [k] of MISSIONS) if (found[k] && !done[k]) { done[k] = true; lastNew = k; confetti(); }
+  if (touched) for (const [k] of MISSIONS) if (found[k] && !done[k]) { done[k] = true; lastNew = k; confetti(); }  // only what the child made, not the opening sky
   try { localStorage.setItem('kids.done', JSON.stringify(done)); } catch { /* private mode */ }
   drawMissions();
 }
