@@ -77,6 +77,10 @@ export const TRY = {
   family: { p: 'blockFactor', label: 'עוצמת החסימה', min: 0, max: 1, step: 0.05, look: 'חסימה חזקה: האוויר הנמוך עוקף את ההר במקום לטפס, והגל והרוטורים נחלשים.' },
 };
 
+// what-if runs of CM1 (same model, same night, one thing changed), offered beside the quick-model slider
+export const RUNS = { base: 'כפי שנמדד', wind15: 'רוח פי 1.5', jet: 'זרם סילון', dry: 'יבש יותר', moist: 'לח יותר' };
+export const STEP_RUNS = { wave: ['base', 'wind15'], moist: ['base', 'dry', 'moist'], birth: ['base', 'dry', 'moist'], through: ['base', 'wind15'], train: ['base', 'jet'], family: ['base', 'wind15'] };
+
 export function keyFor(id) { let k = KEY[id]; if (typeof k === 'string') k = KEY[k]; return k || []; }
 
 export function swatch(sw) {

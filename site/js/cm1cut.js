@@ -18,6 +18,22 @@ export function cutAt(C, x, n, z) {
   return { w, q: q * q, under: false };  // stored sqrt-scaled
 }
 
+/** the 3-D layers of a run: { iso Int16[6], me Int16[2], mr Uint8[2] (RH x2), ul Int8 (u x4) }, each [NY][NX] */
+export function parse3d(meta, buf) {
+  const n = meta.nx * meta.ny, b = new Uint8Array(buf);
+  const i16 = (off, count) => new Int16Array(b.slice(off, off + count * 2).buffer);
+  return { n, iso: i16(0, 6 * n), me: i16(12 * n, 2 * n), mr: b.slice(16 * n, 18 * n), ul: new Int8Array(b.slice(18 * n, 19 * n).buffer) };
+}
+
+/** bilinear sample of one layer of a [layer][NY][NX] grid at map km x, n; null outside the CM1 box */
+export function gridAt(C, arr, layer, x, n) {
+  const m = C.meta, dx = x - C.sx, dn = n - C.sn, s = dx * C.ca + dn * C.sa, c = -dx * C.sa + dn * C.ca;
+  const fi = (s - m.s0_km) / m.dx_km, fj = (c - m.c0_km) / m.dx_km, nx = m.nx, ny = m.ny;
+  if (fi < 0 || fj < 0 || fi >= nx - 1 || fj >= ny - 1) return null;
+  const i = fi | 0, j = fj | 0, u = fi - i, v = fj - j, o = layer * nx * ny + j * nx + i;
+  return (arr[o] * (1 - u) + arr[o + 1] * u) * (1 - v) + (arr[o + nx] * (1 - u) + arr[o + nx + 1] * u) * v;
+}
+
 /** wind speed along the cut at height z (m), from the upstream sounding; never below 3 m/s */
 export function alongWind(prof, z, ca, sa) {
   const k = Math.max(0, Math.min(prof.U.length - 1, Math.round(z / prof.dz)));

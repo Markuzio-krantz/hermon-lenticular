@@ -147,14 +147,16 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
     writeWeather((b, x, n) => Math.sqrt(at(b, x, n) / Math.max(1e-6, mx[b])));
   }
   // from the CM1 3-D simulation (two plates), at a time in minutes
-  let cm1 = null;
-  let cm1Peak = null, cm1Frame = null;
-  async function fromCM1(tMin = 120) {
-    if (!cm1) {
-      const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_weather.bin').then((r) => r.arrayBuffer())]);
-      cm1 = { meta, data: new Uint8Array(buf) };
+  const cm1s = {};   // one entry per CM1 run: base (19.11 as measured) and the what-if scenarios
+  let cm1Peak = null, cm1Frame = null, cm1Tag = 'base';
+  async function fromCM1(tMin = 120, tag = 'base') {
+    if (!cm1s[tag]) {
+      const meta = await fetch(tag === 'base' ? 'data/cm1_meta.json' : `data/cm1_${tag}_meta.json`).then((r) => r.json());
+      const buf = await fetch('data/' + (meta.files?.weather || 'cm1_weather.bin')).then((r) => r.arrayBuffer());
+      cm1s[tag] = { meta, data: new Uint8Array(buf) };
     }
-    const { meta, data } = cm1, nx = meta.nx, ny = meta.ny, dk = meta.dx_km, nb = meta.bands_km.length;
+    cm1Tag = tag;
+    const { meta, data } = cm1s[tag], nx = meta.nx, ny = meta.ny, dk = meta.dx_km, nb = meta.bands_km.length;
     const times = meta.times_s.map((s) => s / 60), last = times.length - 1;
     let f = 0; while (f < last && times[f + 1] <= tMin) f++;
     const w = f < last ? Math.min(1, (tMin - times[f]) / (times[f + 1] - times[f])) : 0, f1 = Math.min(last, f + 1);
@@ -202,7 +204,7 @@ export async function createVolume(container, { heights, res = 1024, satURL, cor
   return {
     canvas, clouds, aerial,
     render(stageCamera) { if (!active) return; syncCamera(stageCamera); reanchor(); composer.render(); },
-    get cm1Peak() { return cm1Peak; }, get cm1Frame() { return cm1Frame; },
+    get cm1Peak() { return cm1Peak; }, get cm1Frame() { return cm1Frame; }, get cm1Tag() { return cm1Tag; },
     fromField, fromCM1, setSunLocal, setExag, setAmount,
     setQuality(q) { clouds.qualityPreset = q; qNow = q; thin = 0; pr(); },
     // below 'low': fewer pixels, same clouds; true while there is still a step left

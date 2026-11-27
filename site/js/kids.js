@@ -343,6 +343,7 @@ let done = {}; try { done = JSON.parse(localStorage.getItem('kids.done') || '{}'
 function drawMissions() {
   $('missions').innerHTML = MISSIONS.map(([k, t]) => `<li class="${done[k] ? 'done' : ''}"><span class="st" aria-hidden="true">⭐</span><span>${t}</span></li>`).join('');
   const n = Object.keys(done).filter((k) => done[k]).length; $('score').textContent = `${n} מתוך ${MISSIONS.length} ⭐`;
+  $('tabScore').textContent = `${n}/${MISSIONS.length}`;
 }
 function tipFor() {
   if (P.wind < 1) return 'בלי רוח האוויר לא עובר מעל ההר, ולכן אין גל ואין ענן. תנו קצת רוח!';
@@ -361,7 +362,7 @@ function report() {
   const list = Object.keys(NAMES).filter((k) => found[k] && !(k === 'lens' && found.train));
   $('found').textContent = list.length ? list.map((k) => NAMES[k]).join(' · ') : 'עוד אין ענן';
   $('tip').textContent = tipFor();
-  if (touched) for (const [k] of MISSIONS) if (found[k] && !done[k]) { done[k] = true; lastNew = k; confetti(); }  // only what the child made, not the opening sky
+  if (touched) for (const [k] of MISSIONS) if (found[k] && !done[k]) { done[k] = true; lastNew = k; confetti(); const t = $('tab-missions'); t.classList.remove('ping'); void t.offsetWidth; t.classList.add('ping'); }  // the missions tab waves when a star is won  // only what the child made, not the opening sky
   try { localStorage.setItem('kids.done', JSON.stringify(done)); } catch { /* private mode */ }
   drawMissions();
 }
@@ -398,10 +399,11 @@ const WORDS = {
 let glossCue = null, glossT = 0;
 for (const b of document.querySelectorAll('[data-w]')) b.addEventListener('click', () => {
   const [t, x, cue] = WORDS[b.dataset.w]; $('wordT').textContent = t; $('wordX').textContent = x; $('wordBox').hidden = false;
+  if (innerWidth <= 860 && $('guide').hidden) { $('tip').textContent = `${t}: ${x}`; }  // phones: the explanation shows right under the picture
   document.querySelectorAll('[data-w]').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
   glossCue = cue; if (cue === 'dew') { follow.on = true; follow.x = X0 + 6; }
   clearTimeout(glossT); glossT = setTimeout(() => { glossCue = null; if (step < 0) follow.on = $('follow').checked; }, 9000);
-  $('sky').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.querySelector('.stage').scrollIntoView({ behavior: 'smooth', block: innerWidth <= 860 ? 'start' : 'nearest' });
 });
 $('gNext').addEventListener('click', () => (step >= STEPS.length - 1 ? endGuide() : setStep(step + 1)));
 $('gPrev').addEventListener('click', () => step > 0 && setStep(step - 1));
@@ -409,3 +411,15 @@ $('gClose').addEventListener('click', endGuide);
 $('reset').addEventListener('click', () => { done = {}; localStorage.removeItem('kids.done'); build(); });
 addEventListener('resize', resize);
 resize(); build(); requestAnimationFrame(frame);
+
+// ---------------- tabs: the machine, the missions, the glossary
+const TABS = ['machine', 'missions', 'words'];
+function showTab(name) {
+  for (const t of TABS) { $('tab-' + t).setAttribute('aria-selected', String(t === name)); $('p-' + t).hidden = t !== name; }
+}
+for (const t of TABS) $('tab-' + t).addEventListener('click', () => showTab(t));
+document.querySelector('.tabs').addEventListener('keydown', (e) => {  // arrows move between tabs (RTL: left = next)
+  const i = TABS.findIndex((t) => $('tab-' + t).getAttribute('aria-selected') === 'true');
+  const d = e.key === 'ArrowLeft' ? 1 : e.key === 'ArrowRight' ? -1 : 0; if (!d) return;
+  const n = TABS[(i + d + TABS.length) % TABS.length]; showTab(n); $('tab-' + n).focus(); e.preventDefault();
+});

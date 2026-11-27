@@ -15,7 +15,7 @@
   header h1 { margin: 0; font-size: clamp(1.2rem, 3.6vw, 1.7rem); font-weight: 700; }
   header a { margin-inline-start: auto; color: var(--ink-2); font-size: .9rem; }
   main { display: grid; grid-template-columns: 1fr 320px; grid-template-rows: auto 1fr; gap: 14px; padding: 0 16px 16px; align-items: start; }
-  .stage { grid-column: 1; grid-row: 1; } main > aside { grid-column: 2; grid-row: 1 / span 2; } main > .words { grid-column: 1; grid-row: 2; padding: 0; }
+  .stage { grid-column: 1; grid-row: 1; } main > aside { grid-column: 2; grid-row: 1; }
   @media (max-width: 860px) { main { grid-template-columns: 1fr; } .stage, main > aside, main > .words { grid-column: 1; grid-row: auto; } main > .words { order: 3; } }
   .stage { position: relative; border-radius: 22px; overflow: hidden; box-shadow: 0 8px 30px rgb(80 60 20 / .15); background: #9ecbff; min-height: 300px; aspect-ratio: 16 / 9; }
   canvas { display: block; width: 100%; height: 100%; }
@@ -74,6 +74,28 @@
   :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   /* phones: the picture keeps the screen width, and the guide sits under it instead of covering it */
   @media (max-width: 860px) { .stage { aspect-ratio: auto; min-height: 0; } #sky { aspect-ratio: 4 / 3; height: auto; } .guide { position: relative; inset: auto; margin: 8px; max-width: none; box-shadow: none; } }
+
+  /* one screen: the picture, and beside it (under it on phones) three tabs: the machine, the missions, the glossary */
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 5px; border-radius: 18px; background: #fff; border: 2px solid var(--line); position: sticky; top: 6px; z-index: 5; }
+  .tabs button { min-height: 44px; border: 0; border-radius: 13px; background: transparent; color: var(--ink-2); font: inherit; font-weight: 500; font-size: .95rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+  .tabs .badge { font-size: .72rem; padding: 1px 6px; border-radius: 999px; background: #fff1c9; color: var(--ink); }
+  .tabs .badge:empty { display: none; }
+  .tabs button.ping { animation: ping .9s ease 2; }
+  @keyframes ping { 50% { transform: scale(1.08); box-shadow: 0 0 0 6px rgb(255 200 80 / .5); } }
+  .panel[hidden] { display: none; }
+  main > aside { align-content: start; }
+  .words.panel .wl { gap: 8px; } .words.panel .wl button { min-width: 0; flex: 1 1 84px; padding: 8px 6px; }
+  .words.panel .wordbox { max-width: none; }
+  @media (min-width: 861px) { main > aside { grid-row: 1; max-height: calc(100vh - 80px); overflow: auto; } .stage { max-height: calc(100vh - 80px); } }
+
+  .tabs button { white-space: nowrap; font-size: .9rem; padding: 0 4px; }
+  /* phones: the tabs come straight under the picture so the missions and the glossary are in sight; the speech bubble and the found-cloud badge stay small and apart */
+  @media (max-width: 860px) {
+    main > aside > .tabs { order: -1; }
+    .bubble { position: relative; inset: auto; top: auto; max-width: none; margin: 8px; } .bubble p { font-size: .92rem; padding: 8px 11px; box-shadow: none; } .bubble .who { width: 40px; height: 30px; }  /* under the picture, not over it */
+    .found { top: 10px; bottom: auto; inset-inline-end: auto; inset-inline-start: 12px; font-size: .85rem; padding: 6px 11px; }  /* on the picture's top corner, clear of the bubble below */
+  }
 </style>
 </head>
 <body>
@@ -97,7 +119,12 @@
       <button class="big" id="guideBtn" type="button">🍦 איך נוצר ענן גלידה? צעד אחר צעד</button>
       <label class="switch"><input id="follow" type="checkbox"> 🎈 לעקוב אחרי בועת אוויר</label>
     </div>
-    <div class="card">
+    <div class="tabs" role="tablist" aria-label="מה עוד יש כאן">
+      <button type="button" role="tab" id="tab-machine" aria-controls="p-machine" aria-selected="true">🎛️ המכונה</button>
+      <button type="button" role="tab" id="tab-missions" aria-controls="p-missions" aria-selected="false">⭐ משימות <b class="badge" id="tabScore"></b></button>
+      <button type="button" role="tab" id="tab-words" aria-controls="p-words" aria-selected="false">📖 מילון</button>
+    </div>
+    <div class="card panel" role="tabpanel" id="p-machine" aria-labelledby="tab-machine">
       <h2>המכונה של מזג האוויר</h2>
       <div class="ctl"><span class="ic" aria-hidden="true">🌬️</span><label for="wind">רוח <small id="o-wind"></small></label><input id="wind" type="range" min="0" max="25" step="1" value="10"></div>
       <div class="ctl"><span class="ic" aria-hidden="true">⛰️</span><label for="hill">גובה ההר <small id="o-hill"></small></label><input id="hill" type="range" min="0.6" max="3" step="0.1" value="2.2"></div>
@@ -106,25 +133,26 @@
       <div class="ctl"><span class="ic" aria-hidden="true">🌫️</span><label for="low">לחות למטה <small id="o-low"></small></label><input id="low" type="range" min="20" max="100" step="1" value="55"></div>
       <label class="switch"><input id="jet" type="checkbox"> 🚀 רוח חזקה מאוד גבוה בשמיים</label>
     </div>
-    <div class="card">
+    <div class="card panel" role="tabpanel" id="p-missions" aria-labelledby="tab-missions" hidden>
       <h2>משימות <span class="score" id="score"></span></h2>
       <ul class="missions" id="missions"></ul>
       <div class="row" style="margin-top:10px"><button class="ghost" id="reset" type="button">להתחיל מחדש</button></div>
     </div>
-  </aside>
-  <section class="words" aria-label="מילון בתמונות">
-    <h2>מילון בתמונות <small>לחצו על מילה</small></h2>
-    <div class="wl">
-      <button type="button" data-w="hum"><span class="ic hum" aria-hidden="true">💧</span>לחות</button>
-      <button type="button" data-w="temp"><span class="ic temp" aria-hidden="true">🌡️</span>טמפרטורה</button>
-      <button type="button" data-w="dew"><span class="ic dew" aria-hidden="true">🥛</span>נקודת הטל</button>
-      <button type="button" data-w="spring"><span class="ic spring" aria-hidden="true">🪀</span>אוויר קפיצי</button>
-      <button type="button" data-w="wave"><span class="ic wave" aria-hidden="true">〰️</span>גל</button>
-      <button type="button" data-w="cond"><span class="ic cond" aria-hidden="true">☁️</span>התעבות</button>
-      <button type="button" data-w="wind"><span class="ic wind" aria-hidden="true">🌬️</span>רוח</button>
+    <div class="card panel words" role="tabpanel" id="p-words" aria-labelledby="tab-words" hidden>
+      <h2>מילון בתמונות <small>לחצו על מילה</small></h2>
+      <div class="wl">
+          <button type="button" data-w="hum"><span class="ic hum" aria-hidden="true">💧</span>לחות</button>
+          <button type="button" data-w="temp"><span class="ic temp" aria-hidden="true">🌡️</span>טמפרטורה</button>
+          <button type="button" data-w="dew"><span class="ic dew" aria-hidden="true">🥛</span>נקודת הטל</button>
+          <button type="button" data-w="spring"><span class="ic spring" aria-hidden="true">🪀</span>אוויר קפיצי</button>
+          <button type="button" data-w="wave"><span class="ic wave" aria-hidden="true">〰️</span>גל</button>
+          <button type="button" data-w="cond"><span class="ic cond" aria-hidden="true">☁️</span>התעבות</button>
+          <button type="button" data-w="wind"><span class="ic wind" aria-hidden="true">🌬️</span>רוח</button>
+        </div>
+        <div class="wordbox" id="wordBox" hidden><b id="wordT"></b><p id="wordX"></p></div>
     </div>
-    <div class="wordbox" id="wordBox" hidden><b id="wordT"></b><p id="wordX"></p></div>
-  </section>
+  </aside>
+
 </main>
 
 <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>

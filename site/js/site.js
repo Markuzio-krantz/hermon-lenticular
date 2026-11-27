@@ -12,7 +12,8 @@ import { initLab, startTour } from './lab.js';
 import { initLearn } from './learn.js';
 import { initSiteTour } from './sitetour.js';
 import { createFocus } from './focus.js';
-import { keyFor, TRY, swatch } from './key.js';
+import { keyFor, TRY, swatch, RUNS, STEP_RUNS } from './key.js';
+import { parse3d, gridAt } from './cm1cut.js';
 import { createThermal } from './thermal.js';
 import { fetchWindow, fetchDay, rowsAt, potential, POINT } from './openmeteo.js';
 
@@ -117,12 +118,38 @@ let anchors = {}, focusRef = null;
 let cm1Cut = null;
 function curtainPath(c, a) {
   const F = cm1Cut && vol?.active && vol.useCM1 ? vol.cm1Frame : null;
-  if (F) { const C = { ...cm1Cut, ...F }; curtain.setPath([F.sx - F.ca * 3, F.sn - F.sa * 3], Math.atan2(F.sa, F.ca)); curtain.setCM1(C); viz.setJourney([F.sx, F.sn], Math.atan2(F.sa, F.ca)); viz.setCM1(C); }
+  if (F) {
+    const C = { ...cm1Cut, ...F }; curtain.setPath([F.sx - F.ca * 3, F.sn - F.sa * 3], Math.atan2(F.sa, F.ca)); curtain.setCM1(C); viz.setJourney([F.sx, F.sn], Math.atan2(F.sa, F.ca)); viz.setCM1(C);
+    if (C.d3 && field) S.setRotors(cm1Rotors(C), field.inner, field.ground, a);
+  }
   else { curtain.setPath([c[0] - Math.cos(a) * 3, c[1] - Math.sin(a) * 3], a); curtain.setCM1(null); viz.setCM1(null); }
 }
-async function loadCM1Cut() {
-  const [meta, buf] = await Promise.all([fetch('data/cm1_meta.json').then((r) => r.json()), fetch('data/cm1_xz.bin').then((r) => r.arrayBuffer())]);
-  if (!meta.xz) return; cm1Cut = { meta, data: new Uint8Array(buf) };
+const cutCache = {};
+async function loadCM1Cut(tag = 'base') {
+  if (!cutCache[tag]) {
+    const meta = await fetch(tag === 'base' ? 'data/cm1_meta.json' : `data/cm1_${tag}_meta.json`).then((r) => r.json());
+    if (!meta.xz) return;
+    const xz = await fetch('data/' + (meta.files?.xz || 'cm1_xz.bin')).then((r) => r.arrayBuffer());
+    const d3 = meta.files?.d3 ? parse3d(meta, await fetch('data/' + meta.files.d3).then((r) => r.arrayBuffer())) : null;
+    cutCache[tag] = { meta, data: new Uint8Array(xz), d3 };
+  }
+  cm1Cut = cutCache[tag];
+}
+// rotors where the simulated wind ~300 m above the ground runs backwards, on the map's rotor grid
+function cm1Rotors(C) {
+  const N = field.inner, cell = 64 / N, out = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const u = gridAt(C, C.d3.ul, 0, (i + 0.5) * cell - 32, 32 - (j + 0.5) * cell); out[j * N + i] = u === null ? 1 : u / 4 < -0.5 ? -1 : 1; }
+  return out;
+}
+// crest and trough of the simulated wave at 4.5 km, near the summit
+function cm1Wave(C) {
+  const m = C.meta, L = 3, at = (s, c) => [C.sx + s * C.ca - c * C.sa, C.sn + s * C.sa + c * C.ca];
+  let best = -1e9, bs = 0, bc = 0;
+  for (let s = -4; s <= 16; s += 0.4) for (let c = -6; c <= 6; c += 0.4) { const [x, n] = at(s, c), e = gridAt(C, C.d3.iso, L, x, n); if (e !== null && e > best) { best = e; bs = s; bc = c; } }
+  let low = 1e9, ls = bs;
+  for (let s = bs + 1; s <= bs + 12; s += 0.4) { const [x, n] = at(s, bc), e = gridAt(C, C.d3.iso, L, x, n); if (e !== null && e < low) { low = e; ls = s; } }
+  const z = m.d3.iso_z[L] / 1000;
+  return { crest: [...at(bs, bc), z + best / 1000], trough: [...at(ls, bc), z + low / 1000] };
 }
 // where the cut's own cloud starts and ends: the labels "enters / leaves the cloud" point there
 function cm1CutAnchors(F) {
@@ -348,7 +375,9 @@ function renderTry(s) {
   }
   box.hidden = !T; box.open = !!s.tryOpen; if (!T) { body.innerHTML = ''; return; }
   const val = T.v === 'sun' ? tw.sunT : state.params[T.p], dec = T.step < 1 ? (T.step < 0.1 ? 2 : 1) : 0;
-  body.innerHTML = `<label class="try-row"><span>${T.label}</span><input type="range" min="${T.min}" max="${T.max}" step="${T.step}" value="${val}"><output>${(+val).toFixed(dec)}</output></label>
+  const runs = STEP_RUNS[s.id], cur = vol?.useCM1 ? vol.cm1Tag : null;
+  const runsHtml = runs && vol ? `<div class="try-runs" role="group" aria-label="ריצות CM1"><small>ריצות CM1 של אותו ערב, עם שינוי אחד:</small><div>${runs.map((r) => `<button type="button" class="chip" data-run="${r}" aria-pressed="${r === cur}">${RUNS[r]}</button>`).join('')}</div></div><small class="try-or">או בחופשיות, במודל המהיר:</small>` : '';
+  body.innerHTML = runsHtml + `<label class="try-row"><span>${T.label}</span><input type="range" min="${T.min}" max="${T.max}" step="${T.step}" value="${val}"><output>${(+val).toFixed(dec)}</output></label>
     <p class="try-look">${T.look}</p><p class="try-model" hidden>מוצג עכשיו <b>המודל המהיר</b>: הוא מגיב מיד לכל שינוי. CM1 הוא ריצה אחת של אותו ערב, ואי אפשר לשנות אותה בזמן אמת. <button type="button" class="chip" data-a="back">חזרה ל-CM1</button></p>`;
   const inp = body.querySelector('input'), o = body.querySelector('output');
   inp.oninput = () => {
@@ -359,8 +388,16 @@ function renderTry(s) {
     state.params[T.p] = v; state.preset = null; lab.sync(); compute();
   };
   body.querySelector('[data-a=back]').onclick = () => { endTry(); renderTry(STEPS[step]); };
+  for (const b of body.querySelectorAll('[data-run]')) b.onclick = async () => {
+    if (tryState) { const t = tryState; tryState = null; lab.setPreset(t.preset || 'sunset', false); compute(); }
+    b.disabled = true; await setCM1(true, true, b.dataset.run); b.disabled = false;
+    for (const x of body.querySelectorAll('[data-run]')) x.setAttribute('aria-pressed', String(x === b));
+    body.querySelector('.try-model').hidden = true;
+    toast(`ריצת CM1: ${RUNS[b.dataset.run]}`);
+  };
 }
 function endTry() {
+  if (vol?.useCM1 && vol.cm1Tag !== 'base' && !tryState) { setCM1(true, true, 'base'); return; }
   if (!tryState) return; const t = tryState; tryState = null;
   lab.setPreset(t.preset || 'sunset', false); compute(); if (t.cm1) setCM1(true, true);
 }
@@ -916,7 +953,7 @@ function cm1Anchors() {
   S.setAim(pk ? [pk[0], pk[2], -pk[1]] : null); S._aimOn = !!pk;
   if (!!pk !== hadAim && state.mode === 'story') setView(STEPS[step].view, 1400);  // re-frame once the lens is known
   if (anchors) anchors.lit = on ? vol.cm1Peak : anchors.lens;
-  if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; const cut = cm1Cut && vol.cm1Frame ? cm1CutAnchors(vol.cm1Frame) : null; if (cut) Object.assign(anchors, cut); }
+  if (on && anchors) { anchors.lens = anchors.lensHi = anchors.train = anchors.birth = vol.cm1Peak; const cut = cm1Cut && vol.cm1Frame ? cm1CutAnchors(vol.cm1Frame) : null; if (cut) Object.assign(anchors, cut); if (cm1Cut?.d3 && vol.cm1Frame) Object.assign(anchors, cm1Wave({ ...cm1Cut, ...vol.cm1Frame })); }
   geometry();
   if (anchors) applyCallouts();
 }  // var: the quality code above already asks for it
@@ -953,10 +990,10 @@ async function startVolume() {
   } catch (err) { console.warn('volumetric view unavailable', err); vol = null; }
 }
 $('volBtn')?.addEventListener('click', () => { if (!vol) return startVolume(); setVolume(!vol.active); });
-async function setCM1(on, quiet = false) {
+async function setCM1(on, quiet = false, tag = 'base') {
   if (!vol) return;
   vol.useCM1 = on; $('cm1Btn').setAttribute('aria-pressed', String(on));
-  if (on) { await vol.fromCM1(120); if (!quiet) toast('העננים מסימולציית הענן (CM1) של ערב 19.11'); } else { if (field) vol.fromField(field); if (!quiet) toast('מודל הגיבוי: המודל הלינארי, מגיב למחוונים'); }
+  if (on) { await Promise.all([vol.fromCM1(120, tag), loadCM1Cut(tag)]); if (!quiet) toast('העננים מסימולציית הענן (CM1) של ערב 19.11'); } else { if (field) vol.fromField(field); if (!quiet) toast('מודל הגיבוי: המודל הלינארי, מגיב למחוונים'); }
   if (field) anchors = computeAnchors(field); cm1Anchors();
 }
 $('cm1Btn')?.addEventListener('click', () => { if (vol) { tryState = null; setCM1(!vol.useCM1); } });

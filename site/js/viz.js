@@ -6,7 +6,7 @@
 //  divide  : the dividing streamline (air below goes around the Hermon)
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { streamline } from './cm1cut.js';
+import { streamline, gridAt } from './cm1cut.js';
 export const STACK_LEVELS = [1500, 2500, 3500, 4500, 5500, 6500];
 
 const STACK = STACK_LEVELS;
@@ -105,8 +105,22 @@ export function createViz(scene, groundAt) {
 
   function shapeSheet(m, z, mode) {
     const p = m.geometry.attributes.position, col = m.geometry.attributes.color, o = lvl(z), need = F.satLift[o];
+    // with a CM1 run set, the sheet is the simulated surface of constant potential temperature, coloured by its own humidity
+    const D = C?.d3, li = mode === 'moist' ? MOIST.indexOf(z) : STACK.indexOf(z);
     for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i), n = -p.getZ(i), e = etaAt(o, x, n) * S.amp;
+      const x = p.getX(i), n = -p.getZ(i);
+      if (D && li >= 0) {
+        const raw = gridAt(C, mode === 'moist' ? D.me : D.iso, li, x, n), e = (raw ?? 0) * S.amp;
+        p.setY(i, Math.max(z + e * S.gain, groundAt(x, n) + 40) / 1000 * exag);
+        if (mode === 'moist') {
+          const rh = raw === null ? 50 : gridAt(C, D.mr, li, x, n) / 2;
+          if (rh >= 100) tmp.copy(cloud);
+          else if (e < 0) tmp.copy(wet).lerp(dry, Math.min(1, -e / 250));
+          else tmp.copy(wet).lerp(nearSat, Math.max(0, Math.min(1, (rh - 60) / 40)) ** 2);
+        } else tmp.copy(m.userData.base).multiplyScalar(0.8 + Math.max(-0.3, Math.min(0.45, e / 700)));
+        col.setXYZ(i, tmp.r, tmp.g, tmp.b); continue;
+      }
+      const e = etaAt(o, x, n) * S.amp;
       const g = groundAt(x, n);
       p.setY(i, Math.max(z + e * S.gain, g + 40) / 1000 * exag);
       if (mode === 'moist') {

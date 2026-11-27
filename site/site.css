@@ -584,3 +584,10 @@ body.focusing .tour-offer, body.touring .tour-offer { display: none; }
 .th-env { display: flex; gap: 6px; flex-wrap: wrap; }
 .th-env .chip[aria-pressed=true] { background: rgb(255 159 184 / .22); }
 @media (max-width: 899px) { .th-chart { height: 140px; } .key-h { display: none; } }
+
+.try-runs { display: flex; flex-direction: column; gap: 6px; }
+.try-runs small, .try-or { font-size: .74rem; color: var(--ink-2); }
+.try-runs div { display: flex; flex-wrap: wrap; gap: 6px; }
+.try-runs .chip { min-height: 32px; font-size: .8rem; }
+.try-runs .chip[aria-pressed=true] { background: rgb(255 159 184 / .25); border-color: rgb(255 159 184 / .6); }
+.try-runs .chip[aria-pressed=true] { background: var(--accent); color: #1a0d12; border-color: var(--accent); font-weight: 600; }
